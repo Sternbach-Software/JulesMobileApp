@@ -1,0 +1,150 @@
+package org.sternbach.software.julesmobileapp.ui.helper
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import org.sternbach.software.julesmobileapp.ui.composable.AppState
+import org.sternbach.software.julesmobileapp.Session
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SessionDetailScreen(
+    session: Session,
+    state: AppState,
+    onApprovePlan: () -> Unit,
+    onSendMessage: (String, String, () -> Unit) -> Unit,
+    onFetchActivity: (String, String) -> Unit,
+    onBack: () -> Unit
+) {
+    var messageText by remember { mutableStateOf("") }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(session.title ?: "Session Details") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(text = "ID: ${session.id}", style = MaterialTheme.typography.bodySmall)
+            Text(text = session.prompt, style = MaterialTheme.typography.bodyLarge)
+
+            if (state.needsPlanApproval) {
+                Button(
+                    onClick = onApprovePlan,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.isApprovingPlan
+                ) {
+                    Text(if (state.isApprovingPlan) "Approving..." else "Approve Plan")
+                }
+            }
+
+            if (state.activitiesError != null) {
+                Text(text = state.activitiesError, color = MaterialTheme.colorScheme.error)
+            }
+            if (state.approvePlanError != null) {
+                Text(text = state.approvePlanError, color = MaterialTheme.colorScheme.error)
+            }
+            if (state.sendMessageError != null) {
+                Text(text = state.sendMessageError, color = MaterialTheme.colorScheme.error)
+            }
+
+            if (state.isLoadingActivities) {
+                CircularProgressIndicator()
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(state.activities) { activity ->
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = activity.originator ?: "Unknown",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                // Render content based on type
+                                if (activity.description != null) {
+                                    Text(activity.description)
+                                }
+                                activity.userMessaged?.userMessage?.let {
+                                    Text(it, style = MaterialTheme.typography.bodyMedium)
+                                }
+                                activity.agentMessaged?.agentMessage?.let {
+                                    Text(it, style = MaterialTheme.typography.bodyMedium)
+                                }
+                                activity.planGenerated?.plan?.steps?.let { steps ->
+                                    Text("Plan Generated:", style = MaterialTheme.typography.titleSmall)
+                                    steps.forEach { step ->
+                                        Text("${step.index}: ${step.title}", style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                }
+                                activity.progressUpdated?.let { progress ->
+                                    Text("${progress.title}: ${progress.description}", style = MaterialTheme.typography.bodyMedium)
+                                }
+
+                                if (activity.progressUpdated == null || activity.progressUpdated.title == null || activity.progressUpdated.description == null) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(onClick = { onFetchActivity(session.id, activity.id) }) {
+                                        Text("Fetch Activity")
+                                    }
+                                }
+
+                                if (activity.sessionFailed != null) {
+                                    activity.sessionFailed.reason?.let { reason ->
+                                        Text("Session Failed: $reason", color = MaterialTheme.colorScheme.error)
+                                    } ?: run {
+                                        Text("Session Failed", color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Send a message...") }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = {
+                        if (messageText.isBlank()) return@IconButton
+                        onSendMessage(session.id, messageText) {
+                            messageText = ""
+                        }
+                    },
+                    enabled = !state.isSendingMessage && messageText.isNotBlank()
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, ("Send"))
+                }
+            }
+        }
+    }
+}

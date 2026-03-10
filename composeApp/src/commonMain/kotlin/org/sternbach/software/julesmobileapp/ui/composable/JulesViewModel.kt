@@ -1,4 +1,4 @@
-package org.sternbach.software.julesmobileapp
+package org.sternbach.software.julesmobileapp.ui.composable
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,8 +10,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import org.sternbach.software.julesmobileapp.Activity
+import org.sternbach.software.julesmobileapp.CacheManager
+import org.sternbach.software.julesmobileapp.CreateSessionRequest
+import org.sternbach.software.julesmobileapp.GithubRepoContext
+import org.sternbach.software.julesmobileapp.JulesClient
+import org.sternbach.software.julesmobileapp.SendMessageRequest
+import org.sternbach.software.julesmobileapp.Session
+import org.sternbach.software.julesmobileapp.Source
+import org.sternbach.software.julesmobileapp.SourceContext
+import org.sternbach.software.julesmobileapp.jsonFormat
 
 data class AppState(
     val currentScreen: Screen = Screen.SessionList,
@@ -67,6 +76,7 @@ class JulesViewModel : ViewModel() {
     }
 
     fun fetchSessions(key: String) {
+        println("viewmodel: fun fetchSessions(key: String) {")
         if (key.isBlank()) return
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -104,6 +114,7 @@ class JulesViewModel : ViewModel() {
     }
 
     fun setApiKey(key: String) {
+        println("viewmodel: fun setApiKey(key: String) {")
         _state.update { it.copy(apiKey = key) }
         viewModelScope.launch(Dispatchers.IO) {
             CacheManager.writeApiKey(key)
@@ -111,15 +122,18 @@ class JulesViewModel : ViewModel() {
     }
 
     fun navigateToSessionList() {
+        println("viewmodel: fun navigateToSessionList() {")
         _state.update { it.copy(currentScreen = Screen.SessionList) }
     }
 
     fun navigateToSessionDetail(session: Session) {
+        println("viewmodel: fun navigateToSessionDetail(session: Session) {")
         _state.update { it.copy(currentScreen = Screen.SessionDetail(session)) }
         loadSessionDetails(session.id)
     }
 
     private fun loadSessionDetails(sessionId: String) {
+        println("viewmodel: private fun loadSessionDetails(sessionId: String) {")
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(isLoadingActivities = true, activitiesError = null) }
             try {
@@ -147,6 +161,7 @@ class JulesViewModel : ViewModel() {
     }
 
     fun setSourceSearchQuery(query: String) {
+        println("viewmodel: fun setSourceSearchQuery(query: String) {")
         val oldQuery = _state.value.sourceSearchQuery
         _state.update { it.copy(sourceSearchQuery = query) }
         if (!_state.value.isInMemorySourceSearch && oldQuery != query) {
@@ -155,11 +170,13 @@ class JulesViewModel : ViewModel() {
     }
 
     fun toggleSourceSearchMode(isInMemory: Boolean) {
+        println("viewmodel: fun toggleSourceSearchMode(isInMemory: Boolean) {")
         _state.update { it.copy(isInMemorySourceSearch = isInMemory) }
         loadSources(reset = true)
     }
 
     fun loadSources(reset: Boolean = false) {
+        println("viewmodel: fun loadSources(reset: Boolean = false) {")
         if (_state.value.isLoadingSources && !reset) return
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -201,6 +218,7 @@ class JulesViewModel : ViewModel() {
     }
 
     fun createSession(prompt: String, title: String, source: Source?, startingBranch: String, requirePlanApproval: Boolean, onSuccess: (Session) -> Unit) {
+        println("viewmodel: fun createSession(prompt: String, title: String, source: Source?, startingBranch: String, requirePlanApproval: Boolean, onSuccess: (Session) -> Unit) {")
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(isCreatingSession = true, createSessionError = null) }
             try {
@@ -239,6 +257,7 @@ class JulesViewModel : ViewModel() {
     }
 
     fun approvePlan(sessionId: String) {
+        println("viewmodel: fun approvePlan(sessionId: String) {")
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(isApprovingPlan = true, approvePlanError = null) }
             try {
@@ -258,6 +277,7 @@ class JulesViewModel : ViewModel() {
     }
 
     fun fetchActivity(sessionId: String, activityId: String) {
+        println("viewmodel: fun fetchActivity(sessionId: String, activityId: String) {")
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val apiKey = _state.value.apiKey

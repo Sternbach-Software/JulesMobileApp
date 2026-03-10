@@ -3,12 +3,11 @@ package org.sternbach.software.julesmobileapp
 import java.io.File
 
 actual object CacheManager {
-    private val cacheFile = File(System.getProperty("user.home"), ".jules_cache.json")
-
-    actual fun readCache(): String? {
-        return if (cacheFile.exists()) {
+    actual fun readPreference(key: String): String? {
+        val file = File(System.getProperty("user.home"), ".jules_$key")
+        return if (file.exists()) {
             try {
-                cacheFile.readText()
+                file.readText()
             } catch (e: Exception) {
                 null
             }
@@ -17,33 +16,25 @@ actual object CacheManager {
         }
     }
 
-    actual fun writeCache(json: String) {
-        try {
-            cacheFile.writeText(json)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private val apiFile = File(System.getProperty("user.home"), ".jules_api_key")
-
-    actual fun readApiKey(): String? {
-        return if (apiFile.exists()) {
-            try {
-                apiFile.readText()
-            } catch (e: Exception) {
-                null
-            }
+    actual fun writePreference(key: String, value: String?) {
+        val file = File(System.getProperty("user.home"), ".jules_$key")
+        if (value == null) {
+            file.delete()
         } else {
-            null
+            try {
+                file.writeText(value)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
-    actual fun writeApiKey(key: String) {
-        try {
-            apiFile.writeText(key)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+    actual fun readBooleanPreference(key: String, defaultValue: Boolean): Boolean {
+        val str = readPreference(key)
+        return str?.toBoolean() ?: defaultValue
+    }
+
+    actual fun writeBooleanPreference(key: String, value: Boolean) {
+        writePreference(key, value.toString())
     }
 }

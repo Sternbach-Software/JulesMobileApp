@@ -25,7 +25,8 @@ fun SessionDetailScreen(
     onApprovePlan: () -> Unit,
     onSendMessage: (String, String, () -> Unit) -> Unit,
     onFetchActivity: (String, String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onTogglePeriodicActivityUpdate: (Boolean, String) -> Unit
 ) {
     var messageText by remember { mutableStateOf("") }
     var isReviewMode by remember { mutableStateOf(false) }
@@ -70,6 +71,27 @@ fun SessionDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Auto Update", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = state.isPeriodicActivityUpdateEnabled,
+                        onCheckedChange = { onTogglePeriodicActivityUpdate(it, session.id) }
+                    )
+                }
+
+                if (state.isLoadingActivities) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    Spacer(modifier = Modifier.size(24.dp))
+                }
+            }
+
             Text(text = "ID: ${session.id}", style = MaterialTheme.typography.bodySmall)
 
             if (state.needsPlanApproval) {
@@ -91,25 +113,26 @@ fun SessionDetailScreen(
             if (state.sendMessageError != null) {
                 Text(text = state.sendMessageError, color = MaterialTheme.colorScheme.error)
             }
-
+            
             if (isReviewMode) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     DiffViewer(diffFiles)
                 }
             } else {
-                if (state.isLoadingActivities) {
-                    CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge, clickable = true)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        CircularProgressIndicator()
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge, clickable = true)
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    if (state.activities.isEmpty() && state.isLoadingActivities) {
                         item {
-                            CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge, clickable = true)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                CircularProgressIndicator()
+                            }
                         }
+                    } else {
                         items(state.activities) { activity ->
                             ActivityCard(activity, onFetchActivity, session)
                         }

@@ -227,7 +227,7 @@ class JulesClient(private val apiKey: String) {
         }
 
         val response = rawResponse.body<ListSourcesResponse>()
-        println("DEBUG: listSources response: $rawResponse")
+        log("DEBUG: listSources response: $rawResponse")
         return response
     }
 
@@ -239,7 +239,7 @@ class JulesClient(private val apiKey: String) {
         }
 
         val response = rawResponse.body<Session>()
-        println("DEBUG: createSession response: $response")
+        log("DEBUG: createSession response: $response")
         return response
     }
 
@@ -249,7 +249,7 @@ class JulesClient(private val apiKey: String) {
         }
 
         val response = rawResponse.body<Session>()
-        println("DEBUG: getSession response: $response")
+        log("DEBUG: getSession response: $response")
         return response
     }
 
@@ -263,7 +263,7 @@ class JulesClient(private val apiKey: String) {
         }
 
         val response = rawResponse.body<ListSessionsResponse>()
-        println("DEBUG: listSessions response: $response")
+        log("DEBUG: listSessions response: $response")
         return response
     }
 
@@ -272,7 +272,7 @@ class JulesClient(private val apiKey: String) {
             header("x-goog-api-key", apiKey)
             contentType(ContentType.Application.Json)
         }
-        println("DEBUG: approvePlan response status: ${rawResponse.status}")
+        log("DEBUG: approvePlan response status: ${rawResponse.status}")
     }
 
     suspend fun listActivities(sessionId: String, pageSize: Int = 50, pageToken: String? = null): ListActivitiesResponse {
@@ -285,7 +285,7 @@ class JulesClient(private val apiKey: String) {
         }
 
         val response = rawResponse.body<ListActivitiesResponse>()
-        println("DEBUG: listActivities response: $response")
+        log("DEBUG: listActivities response: $response")
         return response
     }
 
@@ -293,7 +293,7 @@ class JulesClient(private val apiKey: String) {
         val response = client.get("https://jules.googleapis.com/v1alpha/sessions/$sessionId/activities/$activityId") {
             header("x-goog-api-key", apiKey)
         }.body<Activity>()
-        println("DEBUG: getActivity response: $response")
+        log("DEBUG: getActivity response: $response")
         return response
     }
 
@@ -303,6 +303,6 @@ class JulesClient(private val apiKey: String) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }
-        println("DEBUG: sendMessage response status: ${rawResponse.status}")
+        log("DEBUG: sendMessage response status: ${rawResponse.status}")
     }
 }

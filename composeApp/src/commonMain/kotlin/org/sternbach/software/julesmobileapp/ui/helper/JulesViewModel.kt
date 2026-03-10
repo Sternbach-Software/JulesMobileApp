@@ -21,6 +21,7 @@ import org.sternbach.software.julesmobileapp.Session
 import org.sternbach.software.julesmobileapp.Source
 import org.sternbach.software.julesmobileapp.SourceContext
 import org.sternbach.software.julesmobileapp.jsonFormat
+import org.sternbach.software.julesmobileapp.log
 
 data class AppState(
     val currentScreen: Screen = Screen.SessionList,
@@ -70,19 +71,19 @@ class JulesViewModel : ViewModel() {
                     fetchSessions(cachedKey)
                 }
             } catch (e: Exception) {
-                println("DEBUG: Initialization error: ${e.message}")
+                log("DEBUG: Initialization error: ${e.message}")
             }
         }
     }
 
     fun fetchSessions(key: String) {
-        println("viewmodel: fun fetchSessions(key: String) {")
+        log("viewmodel: fun fetchSessions(key: String) {")
         if (key.isBlank()) return
 
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(isLoadingSessions = true, sessionsError = null) }
             try {
-                println("DEBUG: Fetching sessions with API key: ${key.take(4)}...")
+                log("DEBUG: Fetching sessions with API key: ${key.take(4)}...")
                 val client = JulesClient(key)
                 var nextPageToken: String? = null
                 val allSessions = mutableListOf<Session>()
@@ -95,8 +96,8 @@ class JulesViewModel : ViewModel() {
                     nextPageToken = response.nextPageToken
                 } while (nextPageToken != null)
 
-                println("DEBUG: Fetched ${allSessions.size} sessions")
-                println("DEBUG: Response sessions: $allSessions")
+                log("DEBUG: Fetched ${allSessions.size} sessions")
+                log("DEBUG: Response sessions: $allSessions")
 
                 _state.update { it.copy(sessions = allSessions, isLoadingSessions = false) }
 
@@ -104,17 +105,17 @@ class JulesViewModel : ViewModel() {
                     val jsonString = jsonFormat.encodeToString(allSessions)
                     CacheManager.writeCache(jsonString)
                 } catch (e: Exception) {
-                    println("DEBUG: Failed to cache sessions: ${e.message}")
+                    log("DEBUG: Failed to cache sessions: ${e.message}")
                 }
             } catch (e: Exception) {
-                println("DEBUG: Failed to fetch sessions: ${e.message}")
+                log("DEBUG: Failed to fetch sessions: ${e.message}")
                 _state.update { it.copy(sessionsError = "Failed to fetch: ${e.message}", isLoadingSessions = false) }
             }
         }
     }
 
     fun setApiKey(key: String) {
-        println("viewmodel: fun setApiKey(key: String) {")
+        log("viewmodel: fun setApiKey(key: String) {")
         _state.update { it.copy(apiKey = key) }
         viewModelScope.launch(Dispatchers.IO) {
             CacheManager.writeApiKey(key)
@@ -122,37 +123,37 @@ class JulesViewModel : ViewModel() {
     }
 
     fun navigateToSessionList() {
-        println("viewmodel: fun navigateToSessionList() {")
+        log("viewmodel: fun navigateToSessionList() {")
         _state.update { it.copy(currentScreen = Screen.SessionList) }
     }
 
     fun navigateToSessionDetail(session: Session) {
-        println("viewmodel: fun navigateToSessionDetail(session: Session) {")
+        log("viewmodel: fun navigateToSessionDetail(session: Session) {")
         _state.update { it.copy(currentScreen = Screen.SessionDetail(session)) }
         loadSessionDetails(session.id)
     }
 
     private fun loadSessionDetails(sessionId: String) {
-        println("viewmodel: private fun loadSessionDetails(sessionId: String) {")
+        log("viewmodel: private fun loadSessionDetails(sessionId: String) {")
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(isLoadingActivities = true, activitiesError = null) }
             try {
                 val apiKey = _state.value.apiKey
-                println("DEBUG: Loading details for session: $sessionId with API key: ${apiKey.take(4)}...")
+                log("DEBUG: Loading details for session: $sessionId with API key: ${apiKey.take(4)}...")
                 val client = JulesClient(apiKey)
 
                 // Fetch activities
                 val response = client.listActivities(sessionId = sessionId)
-                println("DEBUG: Fetched ${response.activities?.size ?: 0} activities for session $sessionId")
-                println("DEBUG: Response activities: ${response.activities}")
+                log("DEBUG: Fetched ${response.activities?.size ?: 0} activities for session $sessionId")
+                log("DEBUG: Response activities: ${response.activities}")
                 _state.update { it.copy(activities = response.activities ?: emptyList()) }
 
                 // Update session status to check if plan approval is needed
                 val updatedSession = client.getSession(sessionId)
-                println("DEBUG: Updated session status for $sessionId: ${updatedSession.state}")
+                log("DEBUG: Updated session status for $sessionId: ${updatedSession.state}")
                 _state.update { it.copy(needsPlanApproval = updatedSession.state == "AWAITING_PLAN_APPROVAL") }
             } catch (e: Exception) {
-                println("DEBUG: Failed to load session details: ${e.message}")
+                log("DEBUG: Failed to load session details: ${e.message}")
                 _state.update { it.copy(activitiesError = e.message) }
             } finally {
                 _state.update { it.copy(isLoadingActivities = false) }
@@ -161,7 +162,7 @@ class JulesViewModel : ViewModel() {
     }
 
     fun setSourceSearchQuery(query: String) {
-        println("viewmodel: fun setSourceSearchQuery(query: String) {")
+        log("viewmodel: fun setSourceSearchQuery(query: String) {")
         val oldQuery = _state.value.sourceSearchQuery
         _state.update { it.copy(sourceSearchQuery = query) }
         if (!_state.value.isInMemorySourceSearch && oldQuery != query) {
@@ -170,13 +171,13 @@ class JulesViewModel : ViewModel() {
     }
 
     fun toggleSourceSearchMode(isInMemory: Boolean) {
-        println("viewmodel: fun toggleSourceSearchMode(isInMemory: Boolean) {")
+        log("viewmodel: fun toggleSourceSearchMode(isInMemory: Boolean) {")
         _state.update { it.copy(isInMemorySourceSearch = isInMemory) }
         loadSources(reset = true)
     }
 
     fun loadSources(reset: Boolean = false) {
-        println("viewmodel: fun loadSources(reset: Boolean = false) {")
+        log("viewmodel: fun loadSources(reset: Boolean = false) {")
         if (_state.value.isLoadingSources && !reset) return
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -209,7 +210,7 @@ class JulesViewModel : ViewModel() {
                     }
                 }
             } catch (e: Exception) {
-                println("DEBUG: Failed to load sources: ${e.message}")
+                log("DEBUG: Failed to load sources: ${e.message}")
                 _state.update { it.copy(sourcesError = "Failed to load sources: ${e.message}") }
             } finally {
                 _state.update { it.copy(isLoadingSources = false) }
@@ -218,12 +219,12 @@ class JulesViewModel : ViewModel() {
     }
 
     fun createSession(prompt: String, title: String, source: Source?, startingBranch: String, requirePlanApproval: Boolean, onSuccess: (Session) -> Unit) {
-        println("viewmodel: fun createSession(prompt: String, title: String, source: Source?, startingBranch: String, requirePlanApproval: Boolean, onSuccess: (Session) -> Unit) {")
+        log("viewmodel: fun createSession(prompt: String, title: String, source: Source?, startingBranch: String, requirePlanApproval: Boolean, onSuccess: (Session) -> Unit) {")
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(isCreatingSession = true, createSessionError = null) }
             try {
                 val apiKey = _state.value.apiKey
-                println("DEBUG: Creating session with API key: ${apiKey.take(4)}...")
+                log("DEBUG: Creating session with API key: ${apiKey.take(4)}...")
                 val client = JulesClient(apiKey)
                 val sourceContext = source?.let { src ->
                     SourceContext(
@@ -238,7 +239,7 @@ class JulesViewModel : ViewModel() {
                     requirePlanApproval = requirePlanApproval
                 )
                 val session = client.createSession(request)
-                println("DEBUG: Created session: $session")
+                log("DEBUG: Created session: $session")
 
                 // Refresh sessions and notify success
                 val updatedSessions = listOf(session) + _state.value.sessions
@@ -248,7 +249,7 @@ class JulesViewModel : ViewModel() {
                     onSuccess(session)
                 }
             } catch (e: Exception) {
-                println("DEBUG: Failed to create session: ${e.message}")
+                log("DEBUG: Failed to create session: ${e.message}")
                 _state.update { it.copy(createSessionError = "Failed to create: ${e.message}") }
             } finally {
                 _state.update { it.copy(isCreatingSession = false) }
@@ -257,18 +258,18 @@ class JulesViewModel : ViewModel() {
     }
 
     fun approvePlan(sessionId: String) {
-        println("viewmodel: fun approvePlan(sessionId: String) {")
+        log("viewmodel: fun approvePlan(sessionId: String) {")
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(isApprovingPlan = true, approvePlanError = null) }
             try {
                 val apiKey = _state.value.apiKey
-                println("DEBUG: Approving plan for session: $sessionId with API key: ${apiKey.take(4)}...")
+                log("DEBUG: Approving plan for session: $sessionId with API key: ${apiKey.take(4)}...")
                 val client = JulesClient(apiKey)
                 client.approvePlan(sessionId)
-                println("DEBUG: Approved plan for session: $sessionId")
+                log("DEBUG: Approved plan for session: $sessionId")
                 _state.update { it.copy(needsPlanApproval = false) }
             } catch (e: Exception) {
-                println("DEBUG: Failed to approve plan: ${e.message}")
+                log("DEBUG: Failed to approve plan: ${e.message}")
                 _state.update { it.copy(approvePlanError = "Approval failed: ${e.message}") }
             } finally {
                 _state.update { it.copy(isApprovingPlan = false) }
@@ -277,15 +278,15 @@ class JulesViewModel : ViewModel() {
     }
 
     fun fetchActivity(sessionId: String, activityId: String) {
-        println("viewmodel: fun fetchActivity(sessionId: String, activityId: String) {")
+        log("viewmodel: fun fetchActivity(sessionId: String, activityId: String) {")
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val apiKey = _state.value.apiKey
-                println("DEBUG: Fetching activity $activityId for session: $sessionId with API key: ${apiKey.take(4)}...")
+                log("DEBUG: Fetching activity $activityId for session: $sessionId with API key: ${apiKey.take(4)}...")
                 val client = JulesClient(apiKey)
 
                 val fetchedActivity = client.getActivity(sessionId, activityId)
-                println("DEBUG: Fetched activity: $fetchedActivity")
+                log("DEBUG: Fetched activity: $fetchedActivity")
 
                 // Update the activity in the list
                 val updatedActivities = _state.value.activities.map {
@@ -293,7 +294,7 @@ class JulesViewModel : ViewModel() {
                 }
                 _state.update { it.copy(activities = updatedActivities) }
             } catch (e: Exception) {
-                println("DEBUG: Failed to fetch activity: ${e.message}")
+                log("DEBUG: Failed to fetch activity: ${e.message}")
                 _state.update { it.copy(activitiesError = "Failed to fetch activity: ${e.message}") }
             }
         }
@@ -304,21 +305,21 @@ class JulesViewModel : ViewModel() {
             _state.update { it.copy(isSendingMessage = true, sendMessageError = null) }
             try {
                 val apiKey = _state.value.apiKey
-                println("DEBUG: Sending message to session: $sessionId with API key: ${apiKey.take(4)}...")
+                log("DEBUG: Sending message to session: $sessionId with API key: ${apiKey.take(4)}...")
                 val client = JulesClient(apiKey)
                 client.sendMessage(sessionId, SendMessageRequest(prompt = messageText))
-                println("DEBUG: Sent message to session: $sessionId")
+                log("DEBUG: Sent message to session: $sessionId")
 
                 // Refresh activities
                 val response = client.listActivities(sessionId = sessionId)
-                println("DEBUG: Fetched ${response.activities?.size ?: 0} activities after sending message")
+                log("DEBUG: Fetched ${response.activities?.size ?: 0} activities after sending message")
                 _state.update { it.copy(activities = response.activities ?: emptyList()) }
 
                 withContext(Dispatchers.Main) {
                     onMessageSent()
                 }
             } catch (e: Exception) {
-                println("DEBUG: Failed to send message: ${e.message}")
+                log("DEBUG: Failed to send message: ${e.message}")
                 _state.update { it.copy(sendMessageError = "Failed to send: ${e.message}") }
             } finally {
                 _state.update { it.copy(isSendingMessage = false) }

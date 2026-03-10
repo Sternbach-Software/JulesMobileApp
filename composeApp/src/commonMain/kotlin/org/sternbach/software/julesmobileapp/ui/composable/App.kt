@@ -11,13 +11,14 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.sternbach.software.julesmobileapp.ui.helper.JulesViewModel
 import org.sternbach.software.julesmobileapp.ui.helper.Screen
+import org.sternbach.software.julesmobileapp.ui.theme.AppTheme
 
 @Composable
 fun App() {
     val viewModel = viewModel { JulesViewModel() }
     val state by viewModel.state.collectAsState()
 
-    MaterialTheme {
+    AppTheme {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             when (val screen = state.currentScreen) {
                 is Screen.SessionList -> {

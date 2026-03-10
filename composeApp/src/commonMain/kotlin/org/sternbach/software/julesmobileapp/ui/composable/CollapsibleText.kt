@@ -1,6 +1,7 @@
 package org.sternbach.software.julesmobileapp.ui.composable
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -34,7 +35,10 @@ fun CollapsibleText(
 
     Row(
         verticalAlignment = Alignment.Top,
-        modifier = if(clickable) Modifier.clickable { toggle() } else Modifier
+        modifier = if(clickable) Modifier.clickable(
+            indication = null,
+            interactionSource = MutableInteractionSource(),
+        ) { toggle() } else Modifier
     ) {
         Text(
             text = string,

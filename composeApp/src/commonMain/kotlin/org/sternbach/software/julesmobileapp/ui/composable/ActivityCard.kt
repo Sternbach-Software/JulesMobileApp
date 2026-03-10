@@ -1,6 +1,7 @@
 package org.sternbach.software.julesmobileapp.ui.composable
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,7 +42,7 @@ fun ActivityCard(
             activity.planGenerated?.plan?.steps?.let { steps ->
                 appendLine("Plan Generated:")
                 steps.forEach { step ->
-                    appendLine("${step.index}: ${step.title}")
+                    appendLine("${(step.index ?: 0) + 1}: ${step.title}")
                     step.description?.let { appendLine(it) }
                 }
             }
@@ -64,13 +65,16 @@ fun ActivityCard(
                     appendLine(extractStrings(activity.artifacts, ::extractMedia))
                 }
             }
-        }.toString().trim()
+        }.trim().toString()
     }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { expanded = !expanded }
+            .clickable(
+                indication = null,
+                interactionSource = MutableInteractionSource()
+            ) { expanded = !expanded }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(

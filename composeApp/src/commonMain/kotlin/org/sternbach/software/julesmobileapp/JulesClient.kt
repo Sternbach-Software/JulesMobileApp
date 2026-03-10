@@ -45,7 +45,7 @@ data class SourceContext(
 
 @Serializable
 data class GithubRepoContext(
-    val startingBranch: String
+    val startingBranch: String? = null
 )
 
 @Serializable

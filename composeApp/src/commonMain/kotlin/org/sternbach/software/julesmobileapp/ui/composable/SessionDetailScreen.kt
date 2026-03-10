@@ -12,6 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.sternbach.software.julesmobileapp.Session
+import org.sternbach.software.julesmobileapp.ui.diff.DiffFile
+import org.sternbach.software.julesmobileapp.ui.diff.DiffParser
+import org.sternbach.software.julesmobileapp.ui.diff.DiffViewer
 import org.sternbach.software.julesmobileapp.ui.helper.AppState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,6 +29,23 @@ fun SessionDetailScreen(
     onTogglePeriodicActivityUpdate: (Boolean, String) -> Unit
 ) {
     var messageText by remember { mutableStateOf("") }
+    var isReviewMode by remember { mutableStateOf(false) }
+
+    val diffFiles = remember(state.activities) {
+        val latestDiffs = mutableMapOf<String, DiffFile>()
+        state.activities.forEach { activity ->
+            activity.artifacts?.forEach { artifact ->
+                artifact.changeSet?.gitPatch?.unidiffPatch?.let { diff ->
+                    val parsedFiles = DiffParser.parse(diff)
+                    parsedFiles.forEach { file ->
+                        val key = if (file.newName == "/dev/null") file.oldName else file.newName
+                        latestDiffs[key] = file
+                    }
+                }
+            }
+        }
+        latestDiffs.values.toList()
+    }
 
     Scaffold(
         topBar = {
@@ -34,6 +54,11 @@ fun SessionDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+                actions = {
+                    TextButton(onClick = { isReviewMode = !isReviewMode }) {
+                        Text(if (isReviewMode) "Chat" else "Code")
                     }
                 }
             )
@@ -88,23 +113,29 @@ fun SessionDetailScreen(
             if (state.sendMessageError != null) {
                 Text(text = state.sendMessageError, color = MaterialTheme.colorScheme.error)
             }
-
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge, clickable = true)
+            
+            if (isReviewMode) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    DiffViewer(diffFiles)
                 }
-                if (state.activities.isEmpty() && state.isLoadingActivities) {
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                            CircularProgressIndicator()
-                        }
+                        CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge, clickable = true)
                     }
-                } else {
-                    items(state.activities) { activity ->
-                        ActivityCard(activity, onFetchActivity, session)
+                    if (state.activities.isEmpty() && state.isLoadingActivities) {
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    } else {
+                        items(state.activities) { activity ->
+                            ActivityCard(activity, onFetchActivity, session)
+                        }
                     }
                 }
             }

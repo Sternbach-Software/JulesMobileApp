@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -29,7 +30,7 @@ fun ActivityCard(
     session: Session
 ) {
     var activityFetched by remember { mutableStateOf(false) }
-    var expanded by remember(activity) { mutableStateOf(false) }
+    var expanded by rememberSaveable(activity.id) { mutableStateOf(false) }
 
     val content = remember(activity) {
         StringBuilder().apply {

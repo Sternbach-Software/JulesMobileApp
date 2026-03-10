@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,7 +29,7 @@ fun CollapsibleText(
     clickable: Boolean = false,
     onToggle: (() -> Unit)? = null
 ) {
-    var localExpanded by remember(string) { mutableStateOf(false) }
+    var localExpanded by rememberSaveable(string) { mutableStateOf(false) }
     val isExpanded = expanded ?: localExpanded
     val toggle = onToggle ?: { localExpanded = !localExpanded }
     var isEllipsized by remember(string) { mutableStateOf(false) }

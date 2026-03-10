@@ -148,6 +148,39 @@ data class SessionFailed(
 )
 
 @Serializable
+data class GitPatch(
+    val baseCommitId: String? = null,
+    val unidiffPatch: String? = null,
+    val suggestedCommitMessage: String? = null
+)
+
+@Serializable
+data class ChangeSet(
+    val source: String? = null,
+    val gitPatch: GitPatch? = null
+)
+
+@Serializable
+data class BashOutput(
+    val command: String? = null,
+    val output: String? = null,
+    val exitCode: Int? = null
+)
+
+@Serializable
+data class Media(
+    val mimeType: String? = null,
+    val data: String? = null
+)
+
+@Serializable
+data class Artifact(
+    val changeSet: ChangeSet? = null,
+    val bashOutput: BashOutput? = null,
+    val media: Media? = null
+)
+
+@Serializable
 data class Activity(
     val name: String,
     val id: String,
@@ -160,7 +193,8 @@ data class Activity(
     val agentMessaged: AgentMessaged? = null,
     val progressUpdated: ProgressUpdated? = null,
     // sessionCompleted and sessionFailed could be empty objects
-    val sessionFailed: SessionFailed? = null
+    val sessionFailed: SessionFailed? = null,
+    val artifacts: List<Artifact>? = null
 )
 
 @Serializable
@@ -242,6 +276,14 @@ class JulesClient(private val apiKey: String) {
             }
         }.body<ListActivitiesResponse>()
         println("DEBUG: listActivities response: $response")
+        return response
+    }
+
+    suspend fun getActivity(sessionId: String, activityId: String): Activity {
+        val response = client.get("https://jules.googleapis.com/v1alpha/sessions/$sessionId/activities/$activityId") {
+            header("x-goog-api-key", apiKey)
+        }.body<Activity>()
+        println("DEBUG: getActivity response: $response")
         return response
     }
 

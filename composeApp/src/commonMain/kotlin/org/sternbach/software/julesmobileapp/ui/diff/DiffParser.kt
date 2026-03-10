@@ -115,7 +115,7 @@ object DiffParser {
                     oldLineNum++
                     newLineNum++
                 }
-                line.startsWith("\\ No newline") -> {
+                line.startsWith("No newline at end of file") -> {
                     currentHunkLines.add(DiffLine(DiffLineType.META, line, null, null))
                 }
                 else -> {

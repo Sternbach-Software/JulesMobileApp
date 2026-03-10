@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -79,7 +80,7 @@ fun DiffViewer(files: List<DiffFile>) {
         } else {
             LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 items(files) { file ->
-                    var isExpanded by remember(file, expandAll) { mutableStateOf(expandAll) }
+                    var isExpanded by rememberSaveable(file, expandAll) { mutableStateOf(expandAll) }
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()

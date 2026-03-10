@@ -136,15 +136,57 @@ fun CreateSessionDialog(
                     )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = requirePlanApproval,
-                        onCheckedChange = {
-                            requirePlanApproval = it
-                            CacheManager.writeBooleanPreference(Constants.KEY_PLAN_APPROVAL, it)
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    Text("Plan Mode", style = MaterialTheme.typography.labelLarge)
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        RadioButton(
+                            selected = false,
+                            onClick = null,
+                            enabled = false
+                        )
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text("Interactive plan", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+                            Text("Chat with Jules to understand goals before planning and approval (Not supported by API)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
                         }
-                    )
-                    Text("Require Plan Approval")
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        RadioButton(
+                            selected = requirePlanApproval,
+                            onClick = {
+                                requirePlanApproval = true
+                                CacheManager.writeBooleanPreference(Constants.KEY_PLAN_APPROVAL, true)
+                            }
+                        )
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text("Review", style = MaterialTheme.typography.bodyMedium)
+                            Text("Generate plan and wait for approval", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        RadioButton(
+                            selected = !requirePlanApproval,
+                            onClick = {
+                                requirePlanApproval = false
+                                CacheManager.writeBooleanPreference(Constants.KEY_PLAN_APPROVAL, false)
+                            }
+                        )
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text("Start", style = MaterialTheme.typography.bodyMedium)
+                            Text("Get started without plan approval", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
             }
         },

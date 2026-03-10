@@ -1,4 +1,4 @@
-package org.sternbach.software.julesmobileapp.ui.helper
+package org.sternbach.software.julesmobileapp.ui.composable
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,8 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.sternbach.software.julesmobileapp.ui.composable.AppState
 import org.sternbach.software.julesmobileapp.Session
+import org.sternbach.software.julesmobileapp.ui.helper.AppState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +46,7 @@ fun SessionDetailScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(text = "ID: ${session.id}", style = MaterialTheme.typography.bodySmall)
-            Text(text = session.prompt, style = MaterialTheme.typography.bodyLarge)
+            CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge)
 
             if (state.needsPlanApproval) {
                 Button(
@@ -76,51 +76,7 @@ fun SessionDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(state.activities) { activity ->
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = activity.originator ?: "Unknown",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                // Render content based on type
-                                if (activity.description != null) {
-                                    Text(activity.description)
-                                }
-                                activity.userMessaged?.userMessage?.let {
-                                    Text(it, style = MaterialTheme.typography.bodyMedium)
-                                }
-                                activity.agentMessaged?.agentMessage?.let {
-                                    Text(it, style = MaterialTheme.typography.bodyMedium)
-                                }
-                                activity.planGenerated?.plan?.steps?.let { steps ->
-                                    Text("Plan Generated:", style = MaterialTheme.typography.titleSmall)
-                                    steps.forEach { step ->
-                                        Text("${step.index}: ${step.title}", style = MaterialTheme.typography.bodyMedium)
-                                    }
-                                }
-                                activity.progressUpdated?.let { progress ->
-                                    Text("${progress.title}: ${progress.description}", style = MaterialTheme.typography.bodyMedium)
-                                }
-
-                                if (activity.progressUpdated == null || activity.progressUpdated.title == null || activity.progressUpdated.description == null) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Button(onClick = { onFetchActivity(session.id, activity.id) }) {
-                                        Text("Fetch Activity")
-                                    }
-                                }
-
-                                if (activity.sessionFailed != null) {
-                                    activity.sessionFailed.reason?.let { reason ->
-                                        Text("Session Failed: $reason", color = MaterialTheme.colorScheme.error)
-                                    } ?: run {
-                                        Text("Session Failed", color = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                            }
-                        }
+                        ActivityCard(activity, onFetchActivity, session)
                     }
                 }
             }

@@ -1,4 +1,4 @@
-package org.sternbach.software.julesmobileapp.ui.composable
+package org.sternbach.software.julesmobileapp.ui.helper
 
 import org.sternbach.software.julesmobileapp.Session
 

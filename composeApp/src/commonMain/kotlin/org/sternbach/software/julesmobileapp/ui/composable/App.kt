@@ -1,4 +1,4 @@
-package org.sternbach.software.julesmobileapp.ui.helper
+package org.sternbach.software.julesmobileapp.ui.composable
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -9,8 +9,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
-import org.sternbach.software.julesmobileapp.ui.composable.JulesViewModel
-import org.sternbach.software.julesmobileapp.ui.composable.Screen
+import org.sternbach.software.julesmobileapp.ui.helper.JulesViewModel
+import org.sternbach.software.julesmobileapp.ui.helper.Screen
 
 @Composable
 fun App() {

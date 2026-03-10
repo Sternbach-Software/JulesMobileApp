@@ -97,6 +97,15 @@ data class SendMessageRequest(
 )
 
 @Serializable
+class SendMessageResponse
+
+@Serializable
+class ApprovePlanRequest
+
+@Serializable
+class ApprovePlanResponse
+
+@Serializable
 data class PlanStep(
     val id: String? = null,
     val index: Int? = null,
@@ -138,9 +147,7 @@ data class ProgressUpdated(
 )
 
 @Serializable
-data class SessionCompleted(
-    val dummy: String? = null // Kotlinx serialization needs something or it can be empty class, but empty classes are tricky. Let's make it object if empty, or just use JsonObject
-)
+class SessionCompleted
 
 @Serializable
 data class SessionFailed(
@@ -193,6 +200,7 @@ data class Activity(
     val agentMessaged: AgentMessaged? = null,
     val progressUpdated: ProgressUpdated? = null,
     // sessionCompleted and sessionFailed could be empty objects
+    val sessionCompleted: SessionCompleted? = null,
     val sessionFailed: SessionFailed? = null,
     val artifacts: List<Artifact>? = null
 )
@@ -228,6 +236,16 @@ class JulesClient(private val apiKey: String) {
 
         val response = rawResponse.body<ListSourcesResponse>()
         log("DEBUG: listSources response: $rawResponse")
+        return response
+    }
+
+    suspend fun getSource(sourceId: String): Source {
+        val rawResponse = client.get("https://jules.googleapis.com/v1alpha/sources/$sourceId") {
+            header("x-goog-api-key", apiKey)
+        }
+
+        val response = rawResponse.body<Source>()
+        log("DEBUG: getSource response: $rawResponse")
         return response
     }
 
@@ -267,42 +285,50 @@ class JulesClient(private val apiKey: String) {
         return response
     }
 
-    suspend fun approvePlan(sessionId: String) {
+    suspend fun approvePlan(sessionId: String): ApprovePlanResponse {
         val rawResponse = client.post("https://jules.googleapis.com/v1alpha/sessions/$sessionId:approvePlan") {
             header("x-goog-api-key", apiKey)
             contentType(ContentType.Application.Json)
         }
-        log("DEBUG: approvePlan response status: ${rawResponse.status}")
+        val response = rawResponse.body<ApprovePlanResponse>()
+        log("DEBUG: approvePlan response: $rawResponse")
+        return response
     }
 
-    suspend fun listActivities(sessionId: String, pageSize: Int = 50, pageToken: String? = null): ListActivitiesResponse {
+    suspend fun listActivities(sessionId: String, pageSize: Int = 50, pageToken: String? = null, createTime: String? = null): ListActivitiesResponse {
         val rawResponse = client.get("https://jules.googleapis.com/v1alpha/sessions/$sessionId/activities") {
             header("x-goog-api-key", apiKey)
             parameter("pageSize", pageSize)
             if (pageToken != null) {
                 parameter("pageToken", pageToken)
             }
+            if (createTime != null) {
+                parameter("createTime", createTime)
+            }
         }
 
         val response = rawResponse.body<ListActivitiesResponse>()
-        log("DEBUG: listActivities response: $response")
+        log("DEBUG: listActivities response: $rawResponse")
         return response
     }
 
     suspend fun getActivity(sessionId: String, activityId: String): Activity {
-        val response = client.get("https://jules.googleapis.com/v1alpha/sessions/$sessionId/activities/$activityId") {
+        val rawResponse = client.get("https://jules.googleapis.com/v1alpha/sessions/$sessionId/activities/$activityId") {
             header("x-goog-api-key", apiKey)
-        }.body<Activity>()
-        log("DEBUG: getActivity response: $response")
+        }
+        val response = rawResponse.body<Activity>()
+        log("DEBUG: getActivity response: $rawResponse")
         return response
     }
 
-    suspend fun sendMessage(sessionId: String, request: SendMessageRequest) {
+    suspend fun sendMessage(sessionId: String, request: SendMessageRequest): SendMessageResponse {
         val rawResponse = client.post("https://jules.googleapis.com/v1alpha/sessions/$sessionId:sendMessage") {
             header("x-goog-api-key", apiKey)
             contentType(ContentType.Application.Json)
             setBody(request)
         }
-        log("DEBUG: sendMessage response status: ${rawResponse.status}")
+        val response = rawResponse.body<SendMessageResponse>()
+        log("DEBUG: sendMessage response: $rawResponse")
+        return response
     }
 }

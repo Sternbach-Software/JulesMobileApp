@@ -68,7 +68,7 @@ fun SessionDetailScreen(
             }
 
             if (state.isLoadingActivities) {
-                CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge)
+                CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge, clickable = true)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                     CircularProgressIndicator()
                 }
@@ -78,7 +78,7 @@ fun SessionDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item {
-                        CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge)
+                        CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge, clickable = true)
                     }
                     items(state.activities) { activity ->
                         ActivityCard(activity, onFetchActivity, session)

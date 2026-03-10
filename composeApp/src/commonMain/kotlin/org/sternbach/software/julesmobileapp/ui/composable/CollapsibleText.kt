@@ -24,6 +24,7 @@ fun CollapsibleText(
     string: String,
     style: TextStyle? = null,
     expanded: Boolean? = null,
+    clickable: Boolean = false,
     onToggle: (() -> Unit)? = null
 ) {
     var localExpanded by remember(string) { mutableStateOf(false) }
@@ -33,7 +34,7 @@ fun CollapsibleText(
 
     Row(
         verticalAlignment = Alignment.Top,
-        modifier = Modifier.clickable { toggle() }
+        modifier = if(clickable) Modifier.clickable { toggle() } else Modifier
     ) {
         Text(
             text = string,

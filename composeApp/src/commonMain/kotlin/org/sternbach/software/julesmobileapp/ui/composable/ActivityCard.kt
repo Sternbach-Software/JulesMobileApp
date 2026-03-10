@@ -84,6 +84,7 @@ fun ActivityCard(
                 CollapsibleText(
                     string = content,
                     expanded = expanded,
+                    clickable = true,
                     onToggle = { expanded = !expanded }
                 )
             }

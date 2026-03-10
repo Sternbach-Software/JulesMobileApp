@@ -180,9 +180,16 @@ class JulesClient(private val apiKey: String) {
         }
     }
 
-    suspend fun listSources(): ListSourcesResponse {
+    suspend fun listSources(pageSize: Int = 50, pageToken: String? = null, filter: String? = null): ListSourcesResponse {
         val response = client.get("https://jules.googleapis.com/v1alpha/sources") {
             header("x-goog-api-key", apiKey)
+            parameter("pageSize", pageSize)
+            if (pageToken != null) {
+                parameter("pageToken", pageToken)
+            }
+            if (filter != null) {
+                parameter("filter", filter)
+            }
         }.body<ListSourcesResponse>()
         println("DEBUG: listSources response: $response")
         return response

@@ -5,6 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 
 
 import androidx.compose.material3.*
@@ -477,7 +480,7 @@ fun SessionDetailScreen(
                 title = { Text(session.title ?: "Session Details") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Text("Back" )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 }
             )
@@ -598,7 +601,7 @@ fun SessionDetailScreen(
                     },
                     enabled = !isSending && messageText.isNotBlank()
                 ) {
-                    Text("Send")
+                    Icon(Icons.AutoMirrored.Filled.Send, ("Send"))
                 }
             }
         }

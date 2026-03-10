@@ -28,7 +28,7 @@ fun SessionCard(
             CollapsibleText(session.prompt)
             if (session.state != null) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(text = "State: ${session.state}", style = MaterialTheme.typography.bodySmall)
+                StateBadge(state = session.state)
             }
             if (session.sourceContext != null) {
                 Spacer(modifier = Modifier.height(4.dp))

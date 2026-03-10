@@ -3,6 +3,7 @@ package org.sternbach.software.julesmobileapp.ui.composable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -12,6 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.sternbach.software.julesmobileapp.Session
+import org.sternbach.software.julesmobileapp.ui.diff.DiffFile
+import org.sternbach.software.julesmobileapp.ui.diff.DiffParser
+import org.sternbach.software.julesmobileapp.ui.diff.DiffViewer
 import org.sternbach.software.julesmobileapp.ui.helper.AppState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -22,9 +26,35 @@ fun SessionDetailScreen(
     onApprovePlan: () -> Unit,
     onSendMessage: (String, String, () -> Unit) -> Unit,
     onFetchActivity: (String, String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onTogglePeriodicActivityUpdate: (Boolean, String) -> Unit,
+    onToggleScrollToLastItem: (Boolean) -> Unit
 ) {
     var messageText by remember { mutableStateOf("") }
+    var isReviewMode by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(state.activities) {
+        if (state.isScrollToLastItemEnabled && state.activities.isNotEmpty()) {
+            listState.animateScrollToItem(state.activities.size)
+        }
+    }
+
+    val diffFiles = remember(state.activities) {
+        val latestDiffs = mutableMapOf<String, DiffFile>()
+        state.activities.forEach { activity ->
+            activity.artifacts?.forEach { artifact ->
+                artifact.changeSet?.gitPatch?.unidiffPatch?.let { diff ->
+                    val parsedFiles = DiffParser.parse(diff)
+                    parsedFiles.forEach { file ->
+                        val key = if (file.newName == "/dev/null") file.oldName else file.newName
+                        latestDiffs[key] = file
+                    }
+                }
+            }
+        }
+        latestDiffs.values.toList()
+    }
 
     Scaffold(
         topBar = {
@@ -33,6 +63,11 @@ fun SessionDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+                actions = {
+                    TextButton(onClick = { isReviewMode = !isReviewMode }) {
+                        Text(if (isReviewMode) "Chat" else "Code")
                     }
                 }
             )
@@ -45,6 +80,37 @@ fun SessionDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Auto Update", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = state.isPeriodicActivityUpdateEnabled,
+                        onCheckedChange = { onTogglePeriodicActivityUpdate(it, session.id) }
+                    )
+
+                    if (state.isPeriodicActivityUpdateEnabled) {
+                        Spacer(Modifier.width(16.dp))
+                        Text("Scroll to Last", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.width(8.dp))
+                        Switch(
+                            checked = state.isScrollToLastItemEnabled,
+                            onCheckedChange = { onToggleScrollToLastItem(it) }
+                        )
+                    }
+                }
+
+                if (state.isLoadingActivities) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    Spacer(modifier = Modifier.size(24.dp))
+                }
+            }
+
             Text(text = "ID: ${session.id}", style = MaterialTheme.typography.bodySmall)
 
             if (state.needsPlanApproval) {
@@ -66,22 +132,30 @@ fun SessionDetailScreen(
             if (state.sendMessageError != null) {
                 Text(text = state.sendMessageError, color = MaterialTheme.colorScheme.error)
             }
-
-            if (state.isLoadingActivities) {
-                CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge, clickable = true)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    CircularProgressIndicator()
+            
+            if (isReviewMode) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    DiffViewer(diffFiles)
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item {
                         CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge, clickable = true)
                     }
-                    items(state.activities) { activity ->
-                        ActivityCard(activity, onFetchActivity, session)
+                    if (state.activities.isEmpty() && state.isLoadingActivities) {
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    } else {
+                        items(state.activities) { activity ->
+                            ActivityCard(activity, onFetchActivity, session)
+                        }
                     }
                 }
             }

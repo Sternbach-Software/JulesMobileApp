@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.sternbach.software.julesmobileapp.Session
@@ -21,7 +22,8 @@ fun SessionListScreen(
     onSetSourceSearchQuery: (String) -> Unit,
     onToggleSourceSearchMode: (Boolean) -> Unit,
     onLoadMoreSources: () -> Unit,
-    onCreateSession: (String, String, Source?, String, Boolean, (Session) -> Unit) -> Unit
+    onCreateSession: (String, String, Source?, String, Boolean, (Session) -> Unit) -> Unit,
+    onTogglePeriodicSessionUpdate: (Boolean) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -60,6 +62,27 @@ fun SessionListScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Auto Update", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = state.isPeriodicSessionUpdateEnabled,
+                        onCheckedChange = onTogglePeriodicSessionUpdate
+                    )
+                }
+
+                if (state.isLoadingSessions) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    Spacer(modifier = Modifier.size(24.dp))
+                }
+            }
 
             Button(
                 onClick = onFetchSessions,

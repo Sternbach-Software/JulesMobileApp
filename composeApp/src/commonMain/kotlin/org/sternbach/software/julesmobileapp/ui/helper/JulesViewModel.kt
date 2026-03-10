@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import org.sternbach.software.julesmobileapp.Activity
@@ -30,6 +32,7 @@ data class AppState(
     val sessions: List<Session> = emptyList(),
     val isLoadingSessions: Boolean = false,
     val sessionsError: String? = null,
+    val isPeriodicSessionUpdateEnabled: Boolean = false,
 
     // Create Session
     val sources: List<Source> = emptyList(),
@@ -45,6 +48,8 @@ data class AppState(
     val activities: List<Activity> = emptyList(),
     val isLoadingActivities: Boolean = true,
     val activitiesError: String? = null,
+    val isPeriodicActivityUpdateEnabled: Boolean = false,
+    val isScrollToLastItemEnabled: Boolean = false,
     val needsPlanApproval: Boolean = false,
     val isApprovingPlan: Boolean = false,
     val approvePlanError: String? = null,
@@ -53,6 +58,9 @@ data class AppState(
 )
 
 class JulesViewModel : ViewModel() {
+    private var sessionUpdateJob: kotlinx.coroutines.Job? = null
+    private var activityUpdateJob: kotlinx.coroutines.Job? = null
+
     private val _state = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state.asStateFlow()
 
@@ -77,12 +85,13 @@ class JulesViewModel : ViewModel() {
         }
     }
 
-    fun fetchSessions(key: String) {
-        log("viewmodel: fun fetchSessions(key: String) {")
+    fun fetchSessions(key: String, silent: Boolean = false) {
+        if (!silent) log("viewmodel: fun fetchSessions(key: String) {")
         if (key.isBlank()) return
 
         viewModelScope.launch(Dispatchers.IO) {
-            _state.update { it.copy(isLoadingSessions = true, sessionsError = null) }
+            if (!silent) _state.update { it.copy(isLoadingSessions = true, sessionsError = null) }
+            else _state.update { it.copy(isLoadingSessions = true) }
             try {
                 log("DEBUG: Fetching sessions with API key: ${key.take(4)}...")
                 val client = JulesClient(key)
@@ -97,8 +106,10 @@ class JulesViewModel : ViewModel() {
                     nextPageToken = response.nextPageToken
                 } while (nextPageToken != null)
 
-                log("DEBUG: Fetched ${allSessions.size} sessions")
-                log("DEBUG: Response sessions: $allSessions")
+                if (!silent) {
+                    log("DEBUG: Fetched ${allSessions.size} sessions")
+                    log("DEBUG: Response sessions: $allSessions")
+                }
 
                 _state.update { it.copy(sessions = allSessions, isLoadingSessions = false) }
 
@@ -109,8 +120,9 @@ class JulesViewModel : ViewModel() {
                     log("DEBUG: Failed to cache sessions: ${e.message}")
                 }
             } catch (e: Exception) {
-                log("DEBUG: Failed to fetch sessions: ${e.message}")
-                _state.update { it.copy(sessionsError = "Failed to fetch: ${e.message}", isLoadingSessions = false) }
+                if (!silent) log("DEBUG: Failed to fetch sessions: ${e.message}")
+                if (!silent) _state.update { it.copy(sessionsError = "Failed to fetch: ${e.message}", isLoadingSessions = false) }
+                else _state.update { it.copy(isLoadingSessions = false) }
             }
         }
     }
@@ -123,8 +135,48 @@ class JulesViewModel : ViewModel() {
         }
     }
 
+    fun togglePeriodicSessionUpdate(enabled: Boolean) {
+        _state.update { it.copy(isPeriodicSessionUpdateEnabled = enabled) }
+        if (enabled) {
+            sessionUpdateJob?.cancel()
+            sessionUpdateJob = viewModelScope.launch(Dispatchers.IO) {
+                while (isActive) {
+                    val key = _state.value.apiKey
+                    if (key.isNotBlank()) {
+                        fetchSessions(key, silent = true)
+                    }
+                    delay(5000)
+                }
+            }
+        } else {
+            sessionUpdateJob?.cancel()
+            sessionUpdateJob = null
+        }
+    }
+
+    fun togglePeriodicActivityUpdate(enabled: Boolean, sessionId: String) {
+        _state.update { it.copy(isPeriodicActivityUpdateEnabled = enabled) }
+        if (enabled) {
+            activityUpdateJob?.cancel()
+            activityUpdateJob = viewModelScope.launch(Dispatchers.IO) {
+                while (isActive) {
+                    loadSessionDetails(sessionId, silent = true)
+                    delay(2000)
+                }
+            }
+        } else {
+            activityUpdateJob?.cancel()
+            activityUpdateJob = null
+        }
+    }
+
+    fun toggleScrollToLastItem(enabled: Boolean) {
+        _state.update { it.copy(isScrollToLastItemEnabled = enabled) }
+    }
+
     fun navigateToSessionList() {
         log("viewmodel: fun navigateToSessionList() {")
+        togglePeriodicActivityUpdate(false, "")
         _state.update { it.copy(currentScreen = Screen.SessionList) }
     }
 
@@ -134,28 +186,31 @@ class JulesViewModel : ViewModel() {
         loadSessionDetails(session.id)
     }
 
-    private fun loadSessionDetails(sessionId: String) {
-        log("viewmodel: private fun loadSessionDetails(sessionId: String) {")
+    private fun loadSessionDetails(sessionId: String, silent: Boolean = false) {
+        if (!silent) log("viewmodel: private fun loadSessionDetails(sessionId: String) {")
         viewModelScope.launch(Dispatchers.IO) {
-            _state.update { it.copy(isLoadingActivities = true, activitiesError = null) }
+            if (!silent) _state.update { it.copy(isLoadingActivities = true, activitiesError = null) }
+            else _state.update { it.copy(isLoadingActivities = true) }
             try {
                 val apiKey = _state.value.apiKey
-                log("DEBUG: Loading details for session: $sessionId with API key: ${apiKey.take(4)}...")
+                if (!silent) log("DEBUG: Loading details for session: $sessionId with API key: ${apiKey.take(4)}...")
                 val client = JulesClient(apiKey)
 
                 // Fetch activities
                 val response = client.listActivities(sessionId = sessionId)
-                log("DEBUG: Fetched ${response.activities?.size ?: 0} activities for session $sessionId")
-                log("DEBUG: Response activities: ${response.activities}")
+                if (!silent) {
+                    log("DEBUG: Fetched ${response.activities?.size ?: 0} activities for session $sessionId")
+                    log("DEBUG: Response activities: ${response.activities}")
+                }
                 _state.update { it.copy(activities = response.activities ?: emptyList()) }
 
                 // Update session status to check if plan approval is needed
                 val updatedSession = client.getSession(sessionId)
-                log("DEBUG: Updated session status for $sessionId: ${updatedSession.state}")
+                if (!silent) log("DEBUG: Updated session status for $sessionId: ${updatedSession.state}")
                 _state.update { it.copy(needsPlanApproval = updatedSession.state == "AWAITING_PLAN_APPROVAL") }
             } catch (e: Exception) {
-                log("DEBUG: Failed to load session details: ${e.message}")
-                _state.update { it.copy(activitiesError = e.message) }
+                if (!silent) log("DEBUG: Failed to load session details: ${e.message}")
+                if (!silent) _state.update { it.copy(activitiesError = e.message) }
             } finally {
                 _state.update { it.copy(isLoadingActivities = false) }
             }

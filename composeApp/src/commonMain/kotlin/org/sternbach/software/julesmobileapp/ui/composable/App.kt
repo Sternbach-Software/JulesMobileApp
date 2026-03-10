@@ -46,7 +46,8 @@ fun App() {
                         onLoadMoreSources = { viewModel.loadSources(reset = false) },
                         onCreateSession = { prompt, title, source, startingBranch, requireApproval, onSuccess ->
                             viewModel.createSession(prompt, title, source, startingBranch, requireApproval, onSuccess)
-                        }
+                        },
+                        onTogglePeriodicSessionUpdate = { viewModel.togglePeriodicSessionUpdate(it) }
                     )
                 }
                 is Screen.SessionDetail -> {
@@ -56,7 +57,9 @@ fun App() {
                         onApprovePlan = { viewModel.approvePlan(screen.session.id) },
                         onSendMessage = { sessionId, msg, onSent -> viewModel.sendMessage(sessionId, msg, onSent) },
                         onFetchActivity = { sessionId, activityId -> viewModel.fetchActivity(sessionId, activityId) },
-                        onBack = { viewModel.navigateToSessionList() }
+                        onBack = { viewModel.navigateToSessionList() },
+                        onTogglePeriodicActivityUpdate = { enabled, sessionId -> viewModel.togglePeriodicActivityUpdate(enabled, sessionId) },
+                        onToggleScrollToLastItem = { viewModel.toggleScrollToLastItem(it) }
                     )
                 }
             }

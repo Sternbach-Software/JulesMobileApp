@@ -49,6 +49,7 @@ data class AppState(
     val isLoadingActivities: Boolean = true,
     val activitiesError: String? = null,
     val isPeriodicActivityUpdateEnabled: Boolean = false,
+    val isScrollToLastItemEnabled: Boolean = false,
     val needsPlanApproval: Boolean = false,
     val isApprovingPlan: Boolean = false,
     val approvePlanError: String? = null,
@@ -167,6 +168,10 @@ class JulesViewModel : ViewModel() {
             activityUpdateJob?.cancel()
             activityUpdateJob = null
         }
+    }
+
+    fun toggleScrollToLastItem(enabled: Boolean) {
+        _state.update { it.copy(isScrollToLastItemEnabled = enabled) }
     }
 
     fun navigateToSessionList() {

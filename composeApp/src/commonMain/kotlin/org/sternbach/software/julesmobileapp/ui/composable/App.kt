@@ -58,7 +58,8 @@ fun App() {
                         onSendMessage = { sessionId, msg, onSent -> viewModel.sendMessage(sessionId, msg, onSent) },
                         onFetchActivity = { sessionId, activityId -> viewModel.fetchActivity(sessionId, activityId) },
                         onBack = { viewModel.navigateToSessionList() },
-                        onTogglePeriodicActivityUpdate = { enabled, sessionId -> viewModel.togglePeriodicActivityUpdate(enabled, sessionId) }
+                        onTogglePeriodicActivityUpdate = { enabled, sessionId -> viewModel.togglePeriodicActivityUpdate(enabled, sessionId) },
+                        onToggleScrollToLastItem = { viewModel.toggleScrollToLastItem(it) }
                     )
                 }
             }

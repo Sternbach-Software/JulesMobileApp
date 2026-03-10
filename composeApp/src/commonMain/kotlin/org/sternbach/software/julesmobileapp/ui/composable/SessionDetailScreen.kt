@@ -3,6 +3,7 @@ package org.sternbach.software.julesmobileapp.ui.composable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -26,10 +27,18 @@ fun SessionDetailScreen(
     onSendMessage: (String, String, () -> Unit) -> Unit,
     onFetchActivity: (String, String) -> Unit,
     onBack: () -> Unit,
-    onTogglePeriodicActivityUpdate: (Boolean, String) -> Unit
+    onTogglePeriodicActivityUpdate: (Boolean, String) -> Unit,
+    onToggleScrollToLastItem: (Boolean) -> Unit
 ) {
     var messageText by remember { mutableStateOf("") }
     var isReviewMode by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(state.activities) {
+        if (state.isScrollToLastItemEnabled && state.activities.isNotEmpty()) {
+            listState.animateScrollToItem(state.activities.size)
+        }
+    }
 
     val diffFiles = remember(state.activities) {
         val latestDiffs = mutableMapOf<String, DiffFile>()
@@ -83,6 +92,16 @@ fun SessionDetailScreen(
                         checked = state.isPeriodicActivityUpdateEnabled,
                         onCheckedChange = { onTogglePeriodicActivityUpdate(it, session.id) }
                     )
+
+                    if (state.isPeriodicActivityUpdateEnabled) {
+                        Spacer(Modifier.width(16.dp))
+                        Text("Scroll to Last", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.width(8.dp))
+                        Switch(
+                            checked = state.isScrollToLastItemEnabled,
+                            onCheckedChange = { onToggleScrollToLastItem(it) }
+                        )
+                    }
                 }
 
                 if (state.isLoadingActivities) {
@@ -120,6 +139,7 @@ fun SessionDetailScreen(
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {

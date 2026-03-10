@@ -1,2 +1,3 @@
 composeApp/build/
 .gradle/
+/build/reports/

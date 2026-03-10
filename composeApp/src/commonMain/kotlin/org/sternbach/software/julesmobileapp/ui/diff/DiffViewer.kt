@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.isSystemInDarkTheme
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
+import dev.snipme.highlights.model.SyntaxLanguage
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
@@ -108,6 +109,27 @@ fun DiffViewer(files: List<DiffFile>) {
     }
 }
 
+private fun getLanguageFromExtension(extension: String): SyntaxLanguage {
+    return when (extension.lowercase()) {
+        "kt", "kts" -> SyntaxLanguage.KOTLIN
+        "java" -> SyntaxLanguage.JAVA
+        "swift" -> SyntaxLanguage.SWIFT
+        "js" -> SyntaxLanguage.JAVASCRIPT
+        "ts" -> SyntaxLanguage.TYPESCRIPT
+        "py" -> SyntaxLanguage.PYTHON
+        "c" -> SyntaxLanguage.C
+        "cpp", "h", "hpp" -> SyntaxLanguage.CPP
+        "cs" -> SyntaxLanguage.CSHARP
+        "go" -> SyntaxLanguage.GO
+        "php" -> SyntaxLanguage.PHP
+        "rb" -> SyntaxLanguage.RUBY
+        "sh" -> SyntaxLanguage.SHELL
+        "rs" -> SyntaxLanguage.RUST
+        "dart" -> SyntaxLanguage.DART
+        else -> SyntaxLanguage.DEFAULT
+    }
+}
+
 @Composable
 fun DiffFileView(file: DiffFile, isExpanded: Boolean, onToggle: () -> Unit) {
     Column {
@@ -132,9 +154,17 @@ fun DiffFileView(file: DiffFile, isExpanded: Boolean, onToggle: () -> Unit) {
             val horizontalScrollState = rememberScrollState()
 
             val isDarkTheme = isSystemInDarkTheme()
-            val theme = if (isDarkTheme) SyntaxThemes.darcula() else SyntaxThemes.pastel()
-            val highlightsBuilder = remember(theme) {
-                Highlights.Builder().theme(theme)
+            val theme = if (isDarkTheme) SyntaxThemes.darcula(true) else SyntaxThemes.pastel(false)
+            
+            val language = remember(filename) {
+                val extension = filename.substringAfterLast('.', "")
+                getLanguageFromExtension(extension)
+            }
+
+            val highlightsBuilder = remember(theme, language) {
+                Highlights.Builder()
+                    .theme(theme)
+                    .language(language)
             }
 
             Column(
@@ -162,34 +192,16 @@ fun DiffHunkView(hunk: DiffHunk, highlightsBuilder: Highlights.Builder) {
             modifier = Modifier.background(Color.LightGray.copy(alpha = 0.3f)).fillMaxWidth().padding(2.dp)
         )
 
-        val hunkText = hunk.lines.joinToString("\n") { it.text }
-        val highlights = remember(hunkText, highlightsBuilder) {
-            highlightsBuilder.code(hunkText).build().getHighlights()
-        }
-
-        var currentIndex = 0
         hunk.lines.forEach { line ->
-            val lineLength = line.text.length
-
-            // Filter highlights that intersect with this line
-            val lineHighlights = highlights.mapNotNull { highlight ->
-                when (highlight) {
-                    is ColorHighlight -> {
-                        val start = maxOf(0, highlight.location.start - currentIndex)
-                        val end = minOf(lineLength, highlight.location.end - currentIndex)
-                        if (start < end) ColorHighlight(dev.snipme.highlights.model.PhraseLocation(start, end), highlight.rgb) else null
-                    }
-                    is BoldHighlight -> {
-                        val start = maxOf(0, highlight.location.start - currentIndex)
-                        val end = minOf(lineLength, highlight.location.end - currentIndex)
-                        if (start < end) BoldHighlight(dev.snipme.highlights.model.PhraseLocation(start, end)) else null
-                    }
-                    else -> null
-                }
+            // Highlight each line individually to avoid complex indexing
+            // and potentially improve accuracy by stripping the prefix
+            val codePart = if (line.text.isNotEmpty()) line.text.drop(1) else ""
+            
+            val highlights = remember(codePart, highlightsBuilder) {
+                highlightsBuilder.code(codePart).build().getHighlights()
             }
-
-            DiffLineView(line, lineHighlights)
-            currentIndex += lineLength + 1 // +1 for the newline
+            
+            DiffLineView(line, highlights)
         }
     }
 }
@@ -199,16 +211,15 @@ fun DiffLineView(line: DiffLine, highlights: List<dev.snipme.highlights.model.Co
     val isDarkTheme = isSystemInDarkTheme()
 
     val backgroundColor = when (line.type) {
-        DiffLineType.ADDITION -> if (isDarkTheme) Color(0xFF1E4A28) else Color(0xFFE6FFED)
-        DiffLineType.DELETION -> if (isDarkTheme) Color(0xFF5A1D24) else Color(0xFFFFEEF0)
+        DiffLineType.ADDITION -> if (isDarkTheme) Color(0xFF1E4A28).copy(alpha = 0.4f) else Color(0xFFE6FFED)
+        DiffLineType.DELETION -> if (isDarkTheme) Color(0xFF5A1D24).copy(alpha = 0.4f) else Color(0xFFFFEEF0)
         DiffLineType.CONTEXT -> Color.Transparent
         DiffLineType.META -> Color.Transparent
     }
 
     val defaultTextColor = when (line.type) {
-        DiffLineType.ADDITION -> if (isDarkTheme) Color(0xFF6BDB80) else Color(0xFF22863A)
-        DiffLineType.DELETION -> if (isDarkTheme) Color(0xFFFF7B86) else Color(0xFFCB2431)
-        DiffLineType.CONTEXT -> MaterialTheme.colorScheme.onSurface
+        DiffLineType.ADDITION, DiffLineType.DELETION, DiffLineType.CONTEXT -> 
+            if (isDarkTheme) Color.White else MaterialTheme.colorScheme.onSurface
         DiffLineType.META -> Color.Gray
     }
 
@@ -234,27 +245,45 @@ fun DiffLineView(line: DiffLine, highlights: List<dev.snipme.highlights.model.Co
         )
         Spacer(modifier = Modifier.width(8.dp))
 
-        val codeText = line.text
-        val annotatedString = buildAnnotatedString {
-            append(codeText)
+        val fullText = line.text
+        val prefix = if (fullText.isNotEmpty()) fullText.take(1) else ""
+        val codePart = if (fullText.isNotEmpty()) fullText.drop(1) else ""
 
-            addStyle(SpanStyle(color = defaultTextColor), 0, codeText.length)
+        val annotatedString = buildAnnotatedString {
+            // Render prefix with lower opacity to distinguish from code
+            withStyle(SpanStyle(color = defaultTextColor.copy(alpha = 0.5f))) {
+                append(prefix)
+            }
+            
+            val codeStart = length
+            withStyle(SpanStyle(color = defaultTextColor)) {
+                append(codePart)
+            }
 
             highlights.forEach { highlight ->
-                when (highlight) {
-                    is ColorHighlight -> {
-                        addStyle(
-                            SpanStyle(color = Color(highlight.rgb)),
-                            highlight.location.start,
-                            highlight.location.end
-                        )
-                    }
-                    is BoldHighlight -> {
-                        addStyle(
-                            SpanStyle(fontWeight = FontWeight.Bold),
-                            highlight.location.start,
-                            highlight.location.end
-                        )
+                val start = codeStart + highlight.location.start
+                val end = codeStart + highlight.location.end
+                
+                // Ensure indices are within bounds
+                if (start >= 0 && end <= length && start < end) {
+                    when (highlight) {
+                        is ColorHighlight -> {
+                            // Ensure the color is opaque using bitwise OR with 0xFF000000
+                            // This handles libraries that return 24-bit colors without alpha.
+                            val colorInt = highlight.rgb or 0xFF000000.toInt()
+                            addStyle(
+                                SpanStyle(color = Color(colorInt)),
+                                start,
+                                end
+                            )
+                        }
+                        is BoldHighlight -> {
+                            addStyle(
+                                SpanStyle(fontWeight = FontWeight.Bold),
+                                start,
+                                end
+                            )
+                        }
                     }
                 }
             }
@@ -263,8 +292,7 @@ fun DiffLineView(line: DiffLine, highlights: List<dev.snipme.highlights.model.Co
         Text(
             text = annotatedString,
             style = MaterialTheme.typography.bodyMedium,
-            fontFamily = FontFamily.Monospace,
-            maxLines = 1
+            fontFamily = FontFamily.Monospace
         )
     }
 }

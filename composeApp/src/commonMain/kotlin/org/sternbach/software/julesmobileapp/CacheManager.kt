@@ -1,8 +1,9 @@
 package org.sternbach.software.julesmobileapp
 
 expect object CacheManager {
-    fun readCache(): String?
-    fun writeCache(json: String)
-    fun readApiKey(): String?
-    fun writeApiKey(key: String)
+    // Generic methods
+    fun readPreference(key: String): String?
+    fun writePreference(key: String, value: String?)
+    fun readBooleanPreference(key: String, defaultValue: Boolean): Boolean
+    fun writeBooleanPreference(key: String, value: Boolean)
 }

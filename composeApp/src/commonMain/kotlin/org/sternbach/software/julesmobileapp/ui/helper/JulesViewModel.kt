@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import org.sternbach.software.julesmobileapp.Activity
 import org.sternbach.software.julesmobileapp.CacheManager
+import org.sternbach.software.julesmobileapp.Constants
 import org.sternbach.software.julesmobileapp.CreateSessionRequest
 import org.sternbach.software.julesmobileapp.GithubRepoContext
 import org.sternbach.software.julesmobileapp.JulesClient
@@ -58,11 +59,11 @@ class JulesViewModel : ViewModel() {
     init {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val cachedKey = CacheManager.readApiKey()
+                val cachedKey = CacheManager.readPreference(Constants.KEY_API_KEY)
                 if (!cachedKey.isNullOrBlank()) {
                     _state.update { it.copy(apiKey = cachedKey) }
                 }
-                val cached = CacheManager.readCache()
+                val cached = CacheManager.readPreference(Constants.KEY_CACHE)
                 if (cached != null) {
                     val decoded = jsonFormat.decodeFromString<List<Session>>(cached)
                     _state.update { it.copy(sessions = decoded) }
@@ -103,7 +104,7 @@ class JulesViewModel : ViewModel() {
 
                 try {
                     val jsonString = jsonFormat.encodeToString(allSessions)
-                    CacheManager.writeCache(jsonString)
+                    CacheManager.writePreference(Constants.KEY_CACHE, jsonString)
                 } catch (e: Exception) {
                     log("DEBUG: Failed to cache sessions: ${e.message}")
                 }
@@ -118,7 +119,7 @@ class JulesViewModel : ViewModel() {
         log("viewmodel: fun setApiKey(key: String) {")
         _state.update { it.copy(apiKey = key) }
         viewModelScope.launch(Dispatchers.IO) {
-            CacheManager.writeApiKey(key)
+            CacheManager.writePreference(Constants.KEY_API_KEY, key)
         }
     }
 

@@ -4,21 +4,22 @@ import platform.Foundation.NSUserDefaults
 
 actual object CacheManager {
     private val defaults = NSUserDefaults.standardUserDefaults()
-    private const val CACHE_KEY = "jules_sessions_cache"
 
-    actual fun readCache(): String? {
-        return defaults.stringForKey(CACHE_KEY)
+    // Generic methods implementation
+    actual fun readPreference(key: String): String? {
+        return defaults.stringForKey(key)
     }
 
-    actual fun writeCache(json: String) {
-        defaults.setObject(json, forKey = CACHE_KEY)
+    actual fun writePreference(key: String, value: String?) {
+        defaults.setObject(value, forKey = key)
     }
 
-    actual fun readApiKey(): String? {
-        return defaults.stringForKey("jules_api_key")
+    actual fun readBooleanPreference(key: String, defaultValue: Boolean): Boolean {
+        if (defaults.objectForKey(key) == null) return defaultValue
+        return defaults.boolForKey(key)
     }
 
-    actual fun writeApiKey(key: String) {
-        defaults.setObject(key, forKey = "jules_api_key")
+    actual fun writeBooleanPreference(key: String, value: Boolean) {
+        defaults.setBool(value, forKey = key)
     }
 }

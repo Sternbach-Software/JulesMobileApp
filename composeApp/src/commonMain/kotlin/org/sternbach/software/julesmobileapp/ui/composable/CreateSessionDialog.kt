@@ -6,6 +6,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.sternbach.software.julesmobileapp.CacheManager
+import org.sternbach.software.julesmobileapp.Constants
 import org.sternbach.software.julesmobileapp.Source
 import org.sternbach.software.julesmobileapp.ui.helper.AppState
 
@@ -21,10 +23,22 @@ fun CreateSessionDialog(
 ) {
     var prompt by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
-    var requirePlanApproval by remember { mutableStateOf(true) }
+    var requirePlanApproval by remember { mutableStateOf(CacheManager.readBooleanPreference(Constants.KEY_PLAN_APPROVAL, true)) }
     var selectedSource by remember { mutableStateOf<Source?>(null) }
-    var startingBranch by remember { mutableStateOf("main") }
+    var startingBranch by remember { mutableStateOf(CacheManager.readPreference(Constants.KEY_LAST_BRANCH) ?: "main") }
     var showSourceDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.sources) {
+        if (selectedSource == null) {
+            val lastSourceId = CacheManager.readPreference(Constants.KEY_LAST_SOURCE_ID)
+            if (lastSourceId != null) {
+                val lastSource = state.sources.find { it.id == lastSourceId }
+                if (lastSource != null) {
+                    selectedSource = lastSource
+                }
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -79,6 +93,7 @@ fun CreateSessionDialog(
                             value = startingBranch,
                             onValueChange = {
                                 startingBranch = it
+                                CacheManager.writePreference(Constants.KEY_LAST_BRANCH, it)
                                 branchDropdownExpanded = true
                             },
                             label = { Text("Starting Branch") },
@@ -99,6 +114,7 @@ fun CreateSessionDialog(
                                         text = { Text(branch.displayName) },
                                         onClick = {
                                             startingBranch = branch.displayName
+                                            CacheManager.writePreference(Constants.KEY_LAST_BRANCH, branch.displayName)
                                             branchDropdownExpanded = false
                                         }
                                     )
@@ -109,7 +125,10 @@ fun CreateSessionDialog(
                 } else {
                     TextField(
                         value = startingBranch,
-                        onValueChange = { startingBranch = it },
+                        onValueChange = {
+                            startingBranch = it
+                            CacheManager.writePreference(Constants.KEY_LAST_BRANCH, it)
+                        },
                         label = { Text("Starting Branch") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -120,7 +139,10 @@ fun CreateSessionDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = requirePlanApproval,
-                        onCheckedChange = { requirePlanApproval = it }
+                        onCheckedChange = {
+                            requirePlanApproval = it
+                            CacheManager.writeBooleanPreference(Constants.KEY_PLAN_APPROVAL, it)
+                        }
                     )
                     Text("Require Plan Approval")
                 }
@@ -154,7 +176,9 @@ fun CreateSessionDialog(
             onLoadMoreSources = onLoadMoreSources,
             onSourceSelected = { source ->
                 selectedSource = source
+                CacheManager.writePreference(Constants.KEY_LAST_SOURCE_ID, source.id)
                 startingBranch = source.githubRepo?.defaultBranch?.displayName ?: "main"
+                CacheManager.writePreference(Constants.KEY_LAST_BRANCH, startingBranch)
                 showSourceDialog = false
             }
         )

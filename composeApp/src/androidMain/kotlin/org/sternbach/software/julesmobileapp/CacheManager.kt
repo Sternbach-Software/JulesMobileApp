@@ -13,19 +13,20 @@ actual object CacheManager {
     private val prefs: SharedPreferences?
         get() = appContext?.getSharedPreferences("jules_cache", Context.MODE_PRIVATE)
 
-    actual fun readCache(): String? {
-        return prefs?.getString("sessions_cache", null)
+    // Generic methods implementation
+    actual fun readPreference(key: String): String? {
+        return prefs?.getString(key, null)
     }
 
-    actual fun writeCache(json: String) {
-        prefs?.edit()?.putString("sessions_cache", json)?.apply()
+    actual fun writePreference(key: String, value: String?) {
+        prefs?.edit()?.putString(key, value)?.apply()
     }
 
-    actual fun readApiKey(): String? {
-        return prefs?.getString("api_key", null)
+    actual fun readBooleanPreference(key: String, defaultValue: Boolean): Boolean {
+        return prefs?.getBoolean(key, defaultValue) ?: defaultValue
     }
 
-    actual fun writeApiKey(key: String) {
-        prefs?.edit()?.putString("api_key", key)?.apply()
+    actual fun writeBooleanPreference(key: String, value: Boolean) {
+        prefs?.edit()?.putBoolean(key, value)?.apply()
     }
 }

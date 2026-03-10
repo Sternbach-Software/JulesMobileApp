@@ -1,6 +1,7 @@
 package org.sternbach.software.julesmobileapp.ui.composable
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -8,6 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.sternbach.software.julesmobileapp.ui.helper.JulesViewModel
 import org.sternbach.software.julesmobileapp.ui.helper.Screen
@@ -17,9 +20,19 @@ import org.sternbach.software.julesmobileapp.ui.theme.AppTheme
 fun App() {
     val viewModel = viewModel { JulesViewModel() }
     val state by viewModel.state.collectAsState()
+    val focusManager = LocalFocusManager.current
 
     AppTheme {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = {
+                        focusManager.clearFocus()
+                    })
+                }
+        ) {
             when (val screen = state.currentScreen) {
                 is Screen.SessionList -> {
                     SessionListScreen(

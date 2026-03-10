@@ -19,6 +19,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
+import dev.snipme.highlights.Highlights
+import dev.snipme.highlights.model.SyntaxThemes
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
+import dev.snipme.highlights.model.ColorHighlight
+import dev.snipme.highlights.model.BoldHighlight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,6 +130,13 @@ fun DiffFileView(file: DiffFile, isExpanded: Boolean, onToggle: () -> Unit) {
 
         if (isExpanded) {
             val horizontalScrollState = rememberScrollState()
+
+            val isDarkTheme = isSystemInDarkTheme()
+            val theme = if (isDarkTheme) SyntaxThemes.darcula() else SyntaxThemes.pastel()
+            val highlightsBuilder = remember(theme) {
+                Highlights.Builder().theme(theme)
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -128,7 +144,7 @@ fun DiffFileView(file: DiffFile, isExpanded: Boolean, onToggle: () -> Unit) {
                     .padding(8.dp)
             ) {
                 file.hunks.forEach { hunk ->
-                    DiffHunkView(hunk)
+                    DiffHunkView(hunk, highlightsBuilder)
                 }
             }
         }
@@ -136,7 +152,7 @@ fun DiffFileView(file: DiffFile, isExpanded: Boolean, onToggle: () -> Unit) {
 }
 
 @Composable
-fun DiffHunkView(hunk: DiffHunk) {
+fun DiffHunkView(hunk: DiffHunk, highlightsBuilder: Highlights.Builder) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Text(
             text = hunk.header,
@@ -145,25 +161,54 @@ fun DiffHunkView(hunk: DiffHunk) {
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.background(Color.LightGray.copy(alpha = 0.3f)).fillMaxWidth().padding(2.dp)
         )
+
+        val hunkText = hunk.lines.joinToString("\n") { it.text }
+        val highlights = remember(hunkText, highlightsBuilder) {
+            highlightsBuilder.code(hunkText).build().getHighlights()
+        }
+
+        var currentIndex = 0
         hunk.lines.forEach { line ->
-            DiffLineView(line)
+            val lineLength = line.text.length
+
+            // Filter highlights that intersect with this line
+            val lineHighlights = highlights.mapNotNull { highlight ->
+                when (highlight) {
+                    is ColorHighlight -> {
+                        val start = maxOf(0, highlight.location.start - currentIndex)
+                        val end = minOf(lineLength, highlight.location.end - currentIndex)
+                        if (start < end) ColorHighlight(dev.snipme.highlights.model.PhraseLocation(start, end), highlight.rgb) else null
+                    }
+                    is BoldHighlight -> {
+                        val start = maxOf(0, highlight.location.start - currentIndex)
+                        val end = minOf(lineLength, highlight.location.end - currentIndex)
+                        if (start < end) BoldHighlight(dev.snipme.highlights.model.PhraseLocation(start, end)) else null
+                    }
+                    else -> null
+                }
+            }
+
+            DiffLineView(line, lineHighlights)
+            currentIndex += lineLength + 1 // +1 for the newline
         }
     }
 }
 
 @Composable
-fun DiffLineView(line: DiffLine) {
+fun DiffLineView(line: DiffLine, highlights: List<dev.snipme.highlights.model.CodeHighlight>) {
+    val isDarkTheme = isSystemInDarkTheme()
+
     val backgroundColor = when (line.type) {
-        DiffLineType.ADDITION -> Color(0xFFE6FFED) // Light green
-        DiffLineType.DELETION -> Color(0xFFFFEEF0) // Light red
+        DiffLineType.ADDITION -> if (isDarkTheme) Color(0xFF1E4A28) else Color(0xFFE6FFED)
+        DiffLineType.DELETION -> if (isDarkTheme) Color(0xFF5A1D24) else Color(0xFFFFEEF0)
         DiffLineType.CONTEXT -> Color.Transparent
         DiffLineType.META -> Color.Transparent
     }
 
-    val textColor = when (line.type) {
-        DiffLineType.ADDITION -> Color(0xFF22863A) // Dark green
-        DiffLineType.DELETION -> Color(0xFFCB2431) // Dark red
-        DiffLineType.CONTEXT -> Color.Unspecified
+    val defaultTextColor = when (line.type) {
+        DiffLineType.ADDITION -> if (isDarkTheme) Color(0xFF6BDB80) else Color(0xFF22863A)
+        DiffLineType.DELETION -> if (isDarkTheme) Color(0xFFFF7B86) else Color(0xFFCB2431)
+        DiffLineType.CONTEXT -> MaterialTheme.colorScheme.onSurface
         DiffLineType.META -> Color.Gray
     }
 
@@ -188,10 +233,36 @@ fun DiffLineView(line: DiffLine) {
             fontFamily = FontFamily.Monospace
         )
         Spacer(modifier = Modifier.width(8.dp))
+
+        val codeText = line.text
+        val annotatedString = buildAnnotatedString {
+            append(codeText)
+
+            addStyle(SpanStyle(color = defaultTextColor), 0, codeText.length)
+
+            highlights.forEach { highlight ->
+                when (highlight) {
+                    is ColorHighlight -> {
+                        addStyle(
+                            SpanStyle(color = Color(highlight.rgb)),
+                            highlight.location.start,
+                            highlight.location.end
+                        )
+                    }
+                    is BoldHighlight -> {
+                        addStyle(
+                            SpanStyle(fontWeight = FontWeight.Bold),
+                            highlight.location.start,
+                            highlight.location.end
+                        )
+                    }
+                }
+            }
+        }
+
         Text(
-            text = line.text,
+            text = annotatedString,
             style = MaterialTheme.typography.bodyMedium,
-            color = textColor,
             fontFamily = FontFamily.Monospace,
             maxLines = 1
         )

@@ -124,9 +124,9 @@ private fun extractStrings(artifacts: List<Artifact>, extractString: (Artifact) 
     }
 
 private fun extractChangeset(artifact: Artifact): List<String> = listOfNotNull(
-    artifact.changeSet?.gitPatch?.baseCommitId?.let { "Commit ID: $it" },
     artifact.changeSet?.gitPatch?.suggestedCommitMessage?.let { "Commit message: $it" },
-    artifact.changeSet?.gitPatch?.unidiffPatch?.let { "Diff: $it" }
+    artifact.changeSet?.gitPatch?.unidiffPatch?.let { "Diff: $it" },
+    artifact.changeSet?.gitPatch?.baseCommitId?.let { "Commit ID: $it" }
 )
 
 private fun extractBashOutput(artifact: Artifact): List<String> = listOfNotNull(

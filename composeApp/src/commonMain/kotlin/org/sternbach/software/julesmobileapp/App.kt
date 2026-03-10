@@ -248,14 +248,14 @@ fun CreateSessionDialog(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
+    var sourceSearchQuery by remember { mutableStateOf("") }
+    var sourceDropdownExpanded by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         try {
             val client = JulesClient(apiKey)
             val response = client.listSources()
             sources = response.sources ?: emptyList()
-            if (sources.isNotEmpty()) {
-                selectedSource = sources.first()
-            }
         } catch (e: Exception) {
             error = "Failed to load sources: ${e.message}"
         } finally {
@@ -263,6 +263,7 @@ fun CreateSessionDialog(
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Create Session") },
@@ -292,16 +293,94 @@ fun CreateSessionDialog(
                 } else if (sources.isEmpty()) {
                     Text("No sources available.")
                 } else {
-                    // Simple dropdown replacement - just a text field for now since DropdownMenu can be tricky in commonMain sometimes
-                    Text("Source: ${selectedSource?.name ?: "None"}")
-                    // Alternatively, we can let user type the branch
-                    TextField(
-                        value = startingBranch,
-                        onValueChange = { startingBranch = it },
-                        label = { Text("Starting Branch") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
+                    ExposedDropdownMenuBox(
+                        expanded = sourceDropdownExpanded,
+                        onExpandedChange = { sourceDropdownExpanded = !sourceDropdownExpanded },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        TextField(
+                            value = sourceSearchQuery,
+                            onValueChange = {
+                                sourceSearchQuery = it
+                                sourceDropdownExpanded = true
+                                if (selectedSource != null && it != selectedSource?.name) {
+                                    selectedSource = null
+                                }
+                            },
+                            label = { Text("Source") },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sourceDropdownExpanded) },
+                            colors = ExposedDropdownMenuDefaults.textFieldColors()
+                        )
+                        val filteredSources = sources.filter { it.name.contains(sourceSearchQuery, ignoreCase = true) }
+                        if (filteredSources.isNotEmpty()) {
+                            ExposedDropdownMenu(
+                                expanded = sourceDropdownExpanded,
+                                onDismissRequest = { sourceDropdownExpanded = false }
+                            ) {
+                                filteredSources.forEach { source ->
+                                    DropdownMenuItem(
+                                        text = { Text(source.name) },
+                                        onClick = {
+                                            selectedSource = source
+                                            sourceSearchQuery = source.name
+                                            sourceDropdownExpanded = false
+                                            startingBranch = source.githubRepo?.defaultBranch?.displayName ?: "main"
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (selectedSource != null) {
+                        var branchDropdownExpanded by remember { mutableStateOf(false) }
+                        ExposedDropdownMenuBox(
+                            expanded = branchDropdownExpanded,
+                            onExpandedChange = { branchDropdownExpanded = !branchDropdownExpanded },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            TextField(
+                                value = startingBranch,
+                                onValueChange = {
+                                    startingBranch = it
+                                    branchDropdownExpanded = true
+                                },
+                                label = { Text("Starting Branch") },
+                                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                singleLine = true,
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = branchDropdownExpanded) },
+                                colors = ExposedDropdownMenuDefaults.textFieldColors()
+                            )
+                            val branches = selectedSource?.githubRepo?.branches ?: emptyList()
+                            val filteredBranches = branches.filter { it.displayName.contains(startingBranch, ignoreCase = true) }
+                            if (filteredBranches.isNotEmpty()) {
+                                ExposedDropdownMenu(
+                                    expanded = branchDropdownExpanded,
+                                    onDismissRequest = { branchDropdownExpanded = false }
+                                ) {
+                                    filteredBranches.forEach { branch ->
+                                        DropdownMenuItem(
+                                            text = { Text(branch.displayName) },
+                                            onClick = {
+                                                startingBranch = branch.displayName
+                                                branchDropdownExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        TextField(
+                            value = startingBranch,
+                            onValueChange = { startingBranch = it },
+                            label = { Text("Starting Branch") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = false
+                        )
+                    }
                 }
 
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {

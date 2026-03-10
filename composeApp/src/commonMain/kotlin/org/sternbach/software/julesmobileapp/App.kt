@@ -59,6 +59,7 @@ fun App() {
                         state = state,
                         onApprovePlan = { viewModel.approvePlan(screen.session.id) },
                         onSendMessage = { sessionId, msg, onSent -> viewModel.sendMessage(sessionId, msg, onSent) },
+                        onFetchActivity = { sessionId, activityId -> viewModel.fetchActivity(sessionId, activityId) },
                         onBack = { viewModel.navigateToSessionList() }
                     )
                 }
@@ -347,6 +348,7 @@ fun SessionDetailScreen(
     state: AppState,
     onApprovePlan: () -> Unit,
     onSendMessage: (String, String, () -> Unit) -> Unit,
+    onFetchActivity: (String, String) -> Unit,
     onBack: () -> Unit
 ) {
     var messageText by remember { mutableStateOf("") }
@@ -429,6 +431,14 @@ fun SessionDetailScreen(
                                 activity.progressUpdated?.let { progress ->
                                     Text("${progress.title}: ${progress.description}", style = MaterialTheme.typography.bodyMedium)
                                 }
+
+                                if (activity.progressUpdated == null || activity.progressUpdated.title == null || activity.progressUpdated.description == null) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(onClick = { onFetchActivity(session.id, activity.id) }) {
+                                        Text("Fetch Activity")
+                                    }
+                                }
+
                                 if (activity.sessionFailed != null) {
                                     activity.sessionFailed.reason?.let { reason ->
                                         Text("Session Failed: $reason", color = MaterialTheme.colorScheme.error)

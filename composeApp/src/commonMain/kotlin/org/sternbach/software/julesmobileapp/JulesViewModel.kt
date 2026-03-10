@@ -220,6 +220,28 @@ class JulesViewModel : ViewModel() {
         }
     }
 
+    fun fetchActivity(sessionId: String, activityId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val apiKey = _state.value.apiKey
+                println("DEBUG: Fetching activity $activityId for session: $sessionId with API key: ${apiKey.take(4)}...")
+                val client = JulesClient(apiKey)
+
+                val fetchedActivity = client.getActivity(sessionId, activityId)
+                println("DEBUG: Fetched activity: $fetchedActivity")
+
+                // Update the activity in the list
+                val updatedActivities = _state.value.activities.map {
+                    if (it.id == activityId) fetchedActivity else it
+                }
+                _state.update { it.copy(activities = updatedActivities) }
+            } catch (e: Exception) {
+                println("DEBUG: Failed to fetch activity: ${e.message}")
+                _state.update { it.copy(activitiesError = "Failed to fetch activity: ${e.message}") }
+            }
+        }
+    }
+
     fun sendMessage(sessionId: String, messageText: String, onMessageSent: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(isSendingMessage = true, sendMessageError = null) }

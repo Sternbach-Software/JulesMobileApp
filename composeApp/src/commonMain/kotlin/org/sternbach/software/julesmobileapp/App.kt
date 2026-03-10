@@ -15,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
@@ -47,7 +46,10 @@ fun App() {
                         onApiKeyChange = { viewModel.setApiKey(it) },
                         onFetchSessions = { viewModel.fetchSessions(state.apiKey) },
                         onSessionSelected = { viewModel.navigateToSessionDetail(it) },
-                        onLoadSources = { viewModel.loadSources() },
+                        onLoadSources = { viewModel.loadSources(reset = true) },
+                        onSetSourceSearchQuery = { viewModel.setSourceSearchQuery(it) },
+                        onToggleSourceSearchMode = { viewModel.toggleSourceSearchMode(it) },
+                        onLoadMoreSources = { viewModel.loadSources(reset = false) },
                         onCreateSession = { prompt, title, source, startingBranch, requireApproval, onSuccess ->
                             viewModel.createSession(prompt, title, source, startingBranch, requireApproval, onSuccess)
                         }
@@ -75,6 +77,9 @@ fun SessionListScreen(
     onFetchSessions: () -> Unit,
     onSessionSelected: (Session) -> Unit,
     onLoadSources: () -> Unit,
+    onSetSourceSearchQuery: (String) -> Unit,
+    onToggleSourceSearchMode: (Boolean) -> Unit,
+    onLoadMoreSources: () -> Unit,
     onCreateSession: (String, String, Source?, String, Boolean, (Session) -> Unit) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -165,6 +170,9 @@ fun SessionListScreen(
         CreateSessionDialog(
             state = state,
             onDismiss = { showCreateDialog = false },
+            onSetSourceSearchQuery = onSetSourceSearchQuery,
+            onToggleSourceSearchMode = onToggleSourceSearchMode,
+            onLoadMoreSources = onLoadMoreSources,
             onCreateSession = { prompt, title, source, startingBranch, requireApproval ->
                 onCreateSession(prompt, title, source, startingBranch, requireApproval) { session ->
                     showCreateDialog = false
@@ -179,6 +187,9 @@ fun SessionListScreen(
 fun CreateSessionDialog(
     state: AppState,
     onDismiss: () -> Unit,
+    onSetSourceSearchQuery: (String) -> Unit,
+    onToggleSourceSearchMode: (Boolean) -> Unit,
+    onLoadMoreSources: () -> Unit,
     onCreateSession: (String, String, Source?, String, Boolean) -> Unit
 ) {
     var prompt by remember { mutableStateOf("") }
@@ -186,8 +197,7 @@ fun CreateSessionDialog(
     var requirePlanApproval by remember { mutableStateOf(true) }
     var selectedSource by remember { mutableStateOf<Source?>(null) }
     var startingBranch by remember { mutableStateOf("main") }
-    var sourceSearchQuery by remember { mutableStateOf("") }
-    var sourceDropdownExpanded by remember { mutableStateOf(false) }
+    var showSourceDialog by remember { mutableStateOf(false) }
 
     @OptIn(ExperimentalMaterial3Api::class)
     AlertDialog(
@@ -217,99 +227,68 @@ fun CreateSessionDialog(
                     singleLine = true
                 )
 
-                if (state.isLoadingSources) {
-                    Text("Loading sources...")
-                } else if (state.sources.isEmpty()) {
-                    Text("No sources available.")
-                } else {
+                OutlinedCard(
+                    onClick = { showSourceDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = if (selectedSource == null) "Select Source" else "Source: ${selectedSource?.name}",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        if (selectedSource == null) {
+                            Text(text = "Tap to choose a repository", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+
+                if (selectedSource != null) {
+                    var branchDropdownExpanded by remember { mutableStateOf(false) }
                     ExposedDropdownMenuBox(
-                        expanded = sourceDropdownExpanded,
-                        onExpandedChange = { sourceDropdownExpanded = !sourceDropdownExpanded },
+                        expanded = branchDropdownExpanded,
+                        onExpandedChange = { branchDropdownExpanded = !branchDropdownExpanded },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         TextField(
-                            value = sourceSearchQuery,
+                            value = startingBranch,
                             onValueChange = {
-                                sourceSearchQuery = it
-                                sourceDropdownExpanded = true
-                                if (selectedSource != null && it != selectedSource?.name) {
-                                    selectedSource = null
-                                }
+                                startingBranch = it
+                                branchDropdownExpanded = true
                             },
-                            label = { Text("Source") },
-                            modifier = Modifier.menuAnchor().fillMaxWidth(),
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sourceDropdownExpanded) },
+                            label = { Text("Starting Branch") },
+                            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, true).fillMaxWidth(),
+                            singleLine = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = branchDropdownExpanded) },
                             colors = ExposedDropdownMenuDefaults.textFieldColors()
                         )
-                        val filteredSources = state.sources.filter { it.name.contains(sourceSearchQuery, ignoreCase = true) }
-                        if (filteredSources.isNotEmpty()) {
+                        val branches = selectedSource?.githubRepo?.branches ?: emptyList()
+                        val filteredBranches = branches.filter { it.displayName.contains(startingBranch, ignoreCase = true) }
+                        if (filteredBranches.isNotEmpty()) {
                             ExposedDropdownMenu(
-                                expanded = sourceDropdownExpanded,
-                                onDismissRequest = { sourceDropdownExpanded = false }
+                                expanded = branchDropdownExpanded,
+                                onDismissRequest = { branchDropdownExpanded = false }
                             ) {
-                                filteredSources.forEach { source ->
+                                filteredBranches.forEach { branch ->
                                     DropdownMenuItem(
-                                        text = { Text(source.name) },
+                                        text = { Text(branch.displayName) },
                                         onClick = {
-                                            selectedSource = source
-                                            sourceSearchQuery = source.name
-                                            sourceDropdownExpanded = false
-                                            startingBranch = source.githubRepo?.defaultBranch?.displayName ?: "main"
+                                            startingBranch = branch.displayName
+                                            branchDropdownExpanded = false
                                         }
                                     )
                                 }
                             }
                         }
                     }
-
-                    if (selectedSource != null) {
-                        var branchDropdownExpanded by remember { mutableStateOf(false) }
-                        ExposedDropdownMenuBox(
-                            expanded = branchDropdownExpanded,
-                            onExpandedChange = { branchDropdownExpanded = !branchDropdownExpanded },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            TextField(
-                                value = startingBranch,
-                                onValueChange = {
-                                    startingBranch = it
-                                    branchDropdownExpanded = true
-                                },
-                                label = { Text("Starting Branch") },
-                                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, true).fillMaxWidth(),
-                                singleLine = true,
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = branchDropdownExpanded) },
-                                colors = ExposedDropdownMenuDefaults.textFieldColors()
-                            )
-                            val branches = selectedSource?.githubRepo?.branches ?: emptyList()
-                            val filteredBranches = branches.filter { it.displayName.contains(startingBranch, ignoreCase = true) }
-                            if (filteredBranches.isNotEmpty()) {
-                                ExposedDropdownMenu(
-                                    expanded = branchDropdownExpanded,
-                                    onDismissRequest = { branchDropdownExpanded = false }
-                                ) {
-                                    filteredBranches.forEach { branch ->
-                                        DropdownMenuItem(
-                                            text = { Text(branch.displayName) },
-                                            onClick = {
-                                                startingBranch = branch.displayName
-                                                branchDropdownExpanded = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        TextField(
-                            value = startingBranch,
-                            onValueChange = { startingBranch = it },
-                            label = { Text("Starting Branch") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            enabled = false
-                        )
-                    }
+                } else {
+                    TextField(
+                        value = startingBranch,
+                        onValueChange = { startingBranch = it },
+                        label = { Text("Starting Branch") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = false
+                    )
                 }
 
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -328,11 +307,115 @@ fun CreateSessionDialog(
                         onCreateSession(prompt, title, selectedSource, startingBranch, requirePlanApproval)
                     }
                 },
-                enabled = !state.isCreatingSession && !state.isLoadingSources && prompt.isNotBlank()
+                enabled = !state.isCreatingSession && prompt.isNotBlank()
             ) {
                 Text(if (state.isCreatingSession) "Creating..." else "Create")
             }
         },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+
+    if (showSourceDialog) {
+        SourceSelectionDialog(
+            state = state,
+            onDismiss = { showSourceDialog = false },
+            onSetSourceSearchQuery = onSetSourceSearchQuery,
+            onToggleSourceSearchMode = onToggleSourceSearchMode,
+            onLoadMoreSources = onLoadMoreSources,
+            onSourceSelected = { source ->
+                selectedSource = source
+                startingBranch = source.githubRepo?.defaultBranch?.displayName ?: "main"
+                showSourceDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun SourceSelectionDialog(
+    state: AppState,
+    onDismiss: () -> Unit,
+    onSetSourceSearchQuery: (String) -> Unit,
+    onToggleSourceSearchMode: (Boolean) -> Unit,
+    onLoadMoreSources: () -> Unit,
+    onSourceSelected: (Source) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Source") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.heightIn(max = 500.dp)) {
+                TextField(
+                    value = state.sourceSearchQuery,
+                    onValueChange = onSetSourceSearchQuery,
+                    label = { Text("Search Sources") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Switch(
+                        checked = state.isInMemorySourceSearch,
+                        onCheckedChange = onToggleSourceSearchMode
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("In-memory Search (fetches all pages)")
+                }
+
+                if (state.sourcesError != null) {
+                    Text(text = state.sourcesError, color = MaterialTheme.colorScheme.error)
+                }
+
+                val filteredSources = if (state.isInMemorySourceSearch && state.sourceSearchQuery.isNotBlank()) {
+                    state.sources.filter { it.name.contains(state.sourceSearchQuery, ignoreCase = true) }
+                } else {
+                    state.sources
+                }
+
+                LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(filteredSources) { source ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { onSourceSelected(source) },
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Text(
+                                text = source.name,
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+
+                    if (state.nextSourcePageToken != null && !state.isInMemorySourceSearch) {
+                        item {
+                            Button(
+                                onClick = onLoadMoreSources,
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !state.isLoadingSources
+                            ) {
+                                Text(if (state.isLoadingSources) "Loading..." else "Load More")
+                            }
+                        }
+                    }
+
+                    if (state.isLoadingSources && state.sources.isEmpty()) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancel")

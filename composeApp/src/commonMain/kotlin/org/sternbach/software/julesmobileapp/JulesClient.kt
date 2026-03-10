@@ -215,7 +215,7 @@ class JulesClient(private val apiKey: String) {
     }
 
     suspend fun listSources(pageSize: Int = 50, pageToken: String? = null, filter: String? = null): ListSourcesResponse {
-        val response = client.get("https://jules.googleapis.com/v1alpha/sources") {
+        val rawResponse = client.get("https://jules.googleapis.com/v1alpha/sources") {
             header("x-goog-api-key", apiKey)
             parameter("pageSize", pageSize)
             if (pageToken != null) {
@@ -224,57 +224,67 @@ class JulesClient(private val apiKey: String) {
             if (filter != null) {
                 parameter("filter", filter)
             }
-        }.body<ListSourcesResponse>()
-        println("DEBUG: listSources response: $response")
+        }
+
+        val response = rawResponse.body<ListSourcesResponse>()
+        println("DEBUG: listSources response: $rawResponse")
         return response
     }
 
     suspend fun createSession(request: CreateSessionRequest): Session {
-        val response = client.post("https://jules.googleapis.com/v1alpha/sessions") {
+        val rawResponse = client.post("https://jules.googleapis.com/v1alpha/sessions") {
             header("x-goog-api-key", apiKey)
             contentType(ContentType.Application.Json)
             setBody(request)
-        }.body<Session>()
+        }
+
+        val response = rawResponse.body<Session>()
         println("DEBUG: createSession response: $response")
         return response
     }
 
     suspend fun getSession(sessionId: String): Session {
-        val response = client.get("https://jules.googleapis.com/v1alpha/sessions/$sessionId") {
+        val rawResponse = client.get("https://jules.googleapis.com/v1alpha/sessions/$sessionId") {
             header("x-goog-api-key", apiKey)
-        }.body<Session>()
+        }
+
+        val response = rawResponse.body<Session>()
         println("DEBUG: getSession response: $response")
         return response
     }
 
     suspend fun listSessions(pageSize: Int = 50, pageToken: String? = null): ListSessionsResponse {
-        val response = client.get("https://jules.googleapis.com/v1alpha/sessions") {
+        val rawResponse = client.get("https://jules.googleapis.com/v1alpha/sessions") {
             header("x-goog-api-key", apiKey)
             parameter("pageSize", pageSize)
             if (pageToken != null) {
                 parameter("pageToken", pageToken)
             }
-        }.body<ListSessionsResponse>()
+        }
+
+        val response = rawResponse.body<ListSessionsResponse>()
         println("DEBUG: listSessions response: $response")
         return response
     }
 
     suspend fun approvePlan(sessionId: String) {
-        val response = client.post("https://jules.googleapis.com/v1alpha/sessions/$sessionId:approvePlan") {
+        val rawResponse = client.post("https://jules.googleapis.com/v1alpha/sessions/$sessionId:approvePlan") {
             header("x-goog-api-key", apiKey)
             contentType(ContentType.Application.Json)
         }
-        println("DEBUG: approvePlan response status: ${response.status}")
+        println("DEBUG: approvePlan response status: ${rawResponse.status}")
     }
 
     suspend fun listActivities(sessionId: String, pageSize: Int = 50, pageToken: String? = null): ListActivitiesResponse {
-        val response = client.get("https://jules.googleapis.com/v1alpha/sessions/$sessionId/activities") {
+        val rawResponse = client.get("https://jules.googleapis.com/v1alpha/sessions/$sessionId/activities") {
             header("x-goog-api-key", apiKey)
             parameter("pageSize", pageSize)
             if (pageToken != null) {
                 parameter("pageToken", pageToken)
             }
-        }.body<ListActivitiesResponse>()
+        }
+
+        val response = rawResponse.body<ListActivitiesResponse>()
         println("DEBUG: listActivities response: $response")
         return response
     }
@@ -288,11 +298,11 @@ class JulesClient(private val apiKey: String) {
     }
 
     suspend fun sendMessage(sessionId: String, request: SendMessageRequest) {
-        val response = client.post("https://jules.googleapis.com/v1alpha/sessions/$sessionId:sendMessage") {
+        val rawResponse = client.post("https://jules.googleapis.com/v1alpha/sessions/$sessionId:sendMessage") {
             header("x-goog-api-key", apiKey)
             contentType(ContentType.Application.Json)
             setBody(request)
         }
-        println("DEBUG: sendMessage response status: ${response.status}")
+        println("DEBUG: sendMessage response status: ${rawResponse.status}")
     }
 }

@@ -24,6 +24,9 @@ data class AppState(
     val sources: List<Source> = emptyList(),
     val isLoadingSources: Boolean = false,
     val sourcesError: String? = null,
+    val nextSourcePageToken: String? = null,
+    val sourceSearchQuery: String = "",
+    val isInMemorySourceSearch: Boolean = false,
     val isCreatingSession: Boolean = false,
     val createSessionError: String? = null,
 
@@ -143,17 +146,51 @@ class JulesViewModel : ViewModel() {
         }
     }
 
-    fun loadSources() {
+    fun setSourceSearchQuery(query: String) {
+        val oldQuery = _state.value.sourceSearchQuery
+        _state.update { it.copy(sourceSearchQuery = query) }
+        if (!_state.value.isInMemorySourceSearch && oldQuery != query) {
+            loadSources(reset = true)
+        }
+    }
+
+    fun toggleSourceSearchMode(isInMemory: Boolean) {
+        _state.update { it.copy(isInMemorySourceSearch = isInMemory) }
+        loadSources(reset = true)
+    }
+
+    fun loadSources(reset: Boolean = false) {
+        if (_state.value.isLoadingSources && !reset) return
+
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(isLoadingSources = true, sourcesError = null) }
             try {
-                val apiKey = _state.value.apiKey
-                println("DEBUG: Loading sources with API key: ${apiKey.take(4)}...")
-                val client = JulesClient(apiKey)
-                val response = client.listSources()
-                println("DEBUG: Fetched ${response.sources?.size ?: 0} sources")
-                println("DEBUG: Response sources: ${response.sources}")
-                _state.update { it.copy(sources = response.sources ?: emptyList()) }
+                val currentState = _state.value
+                val client = JulesClient(currentState.apiKey)
+                
+                if (currentState.isInMemorySourceSearch) {
+                    val allSources = mutableListOf<Source>()
+                    var token: String? = null
+                    do {
+                        val response = client.listSources(pageSize = 100, pageToken = token)
+                        allSources.addAll(response.sources ?: emptyList())
+                        token = response.nextPageToken
+                    } while (token != null)
+                    _state.update { it.copy(sources = allSources, nextSourcePageToken = null) }
+                } else {
+                    val currentToken = if (reset) null else currentState.nextSourcePageToken
+                    val response = client.listSources(
+                        pageSize = 50,
+                        pageToken = currentToken,
+                        filter = currentState.sourceSearchQuery.takeIf { it.isNotBlank() }
+                    )
+                    _state.update { 
+                        it.copy(
+                            sources = if (reset) (response.sources ?: emptyList()) else (it.sources + (response.sources ?: emptyList())),
+                            nextSourcePageToken = response.nextPageToken
+                        )
+                    }
+                }
             } catch (e: Exception) {
                 println("DEBUG: Failed to load sources: ${e.message}")
                 _state.update { it.copy(sourcesError = "Failed to load sources: ${e.message}") }

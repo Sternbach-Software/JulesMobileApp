@@ -192,7 +192,54 @@ fun DiffHunkView(hunk: DiffHunk, highlightsBuilder: Highlights.Builder) {
             modifier = Modifier.background(Color.LightGray.copy(alpha = 0.3f)).fillMaxWidth().padding(2.dp)
         )
 
-        hunk.lines.forEach { line ->
+        val showOld = BooleanArray(hunk.lines.size) { true }
+        val showNew = BooleanArray(hunk.lines.size) { true }
+
+        var nextDiffType: DiffLineType? = null
+        val nextTypeForContext = Array<DiffLineType?>(hunk.lines.size) { null }
+        for (i in hunk.lines.indices.reversed()) {
+            val line = hunk.lines[i]
+            if (line.type == DiffLineType.ADDITION || line.type == DiffLineType.DELETION) {
+                nextDiffType = line.type
+            }
+            if (line.type == DiffLineType.CONTEXT) {
+                nextTypeForContext[i] = nextDiffType
+            }
+        }
+
+        var prevDiffType: DiffLineType? = null
+        for (i in hunk.lines.indices) {
+            val line = hunk.lines[i]
+            if (line.type == DiffLineType.ADDITION || line.type == DiffLineType.DELETION) {
+                prevDiffType = line.type
+            }
+            if (line.type == DiffLineType.CONTEXT) {
+                if (line.oldLineNumber != null && line.oldLineNumber == line.newLineNumber) {
+                    val resolvedType = nextTypeForContext[i] ?: prevDiffType ?: DiffLineType.DELETION
+                    if (resolvedType == DiffLineType.ADDITION) {
+                        showOld[i] = false
+                        showNew[i] = true
+                    } else if (resolvedType == DiffLineType.DELETION) {
+                        showOld[i] = true
+                        showNew[i] = false
+                    }
+                } else {
+                    showOld[i] = true
+                    showNew[i] = true
+                }
+            } else if (line.type == DiffLineType.ADDITION) {
+                showOld[i] = false
+                showNew[i] = true
+            } else if (line.type == DiffLineType.DELETION) {
+                showOld[i] = true
+                showNew[i] = false
+            } else if (line.type == DiffLineType.META) {
+                showOld[i] = false
+                showNew[i] = false
+            }
+        }
+
+        hunk.lines.forEachIndexed { index, line ->
             // Highlight each line individually to avoid complex indexing
             // and potentially improve accuracy by stripping the prefix
             val codePart = if (line.text.isNotEmpty()) line.text.drop(1) else ""
@@ -201,13 +248,18 @@ fun DiffHunkView(hunk: DiffHunk, highlightsBuilder: Highlights.Builder) {
                 highlightsBuilder.code(codePart).build().getHighlights()
             }
             
-            DiffLineView(line, highlights)
+            DiffLineView(line, highlights, showOld[index], showNew[index])
         }
     }
 }
 
 @Composable
-fun DiffLineView(line: DiffLine, highlights: List<dev.snipme.highlights.model.CodeHighlight>) {
+fun DiffLineView(
+    line: DiffLine,
+    highlights: List<dev.snipme.highlights.model.CodeHighlight>,
+    showOldNumber: Boolean = true,
+    showNewNumber: Boolean = true
+) {
     val isDarkTheme = isSystemInDarkTheme()
 
     val backgroundColor = when (line.type) {
@@ -230,14 +282,14 @@ fun DiffLineView(line: DiffLine, highlights: List<dev.snipme.highlights.model.Co
             .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Text(
-            text = line.oldLineNumber?.toString() ?: "   ",
+            text = if (showOldNumber) (line.oldLineNumber?.toString() ?: "   ") else "   ",
             modifier = Modifier.width(32.dp),
             style = MaterialTheme.typography.bodySmall,
             color = Color.Gray,
             fontFamily = FontFamily.Monospace
         )
         Text(
-            text = line.newLineNumber?.toString() ?: "   ",
+            text = if (showNewNumber) (line.newLineNumber?.toString() ?: "   ") else "   ",
             modifier = Modifier.width(32.dp),
             style = MaterialTheme.typography.bodySmall,
             color = Color.Gray,

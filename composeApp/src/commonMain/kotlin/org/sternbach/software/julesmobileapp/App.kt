@@ -12,6 +12,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -32,41 +34,31 @@ sealed class Screen {
 
 @Composable
 fun App() {
+    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel { JulesViewModel() }
+    val state by viewModel.state.collectAsState()
+
     MaterialTheme {
-        var currentScreen by remember { mutableStateOf<Screen>(Screen.SessionList) }
-        var apiKey by remember { mutableStateOf("") }
-
-        // Read API key cache on startup
-        LaunchedEffect(Unit) {
-            try {
-                val cachedKey = CacheManager.readApiKey()
-                if (!cachedKey.isNullOrBlank()) {
-                    apiKey = cachedKey
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            when (val screen = currentScreen) {
+            when (val screen = state.currentScreen) {
                 is Screen.SessionList -> {
                     SessionListScreen(
-                        apiKey = apiKey,
-                        onApiKeyChange = {
-                            apiKey = it
-                            CacheManager.writeApiKey(it)
-                        },
-                        onSessionSelected = { session ->
-                            currentScreen = Screen.SessionDetail(session)
+                        state = state,
+                        onApiKeyChange = { viewModel.setApiKey(it) },
+                        onFetchSessions = { viewModel.fetchSessions(state.apiKey) },
+                        onSessionSelected = { viewModel.navigateToSessionDetail(it) },
+                        onLoadSources = { viewModel.loadSources() },
+                        onCreateSession = { prompt, title, source, startingBranch, requireApproval, onSuccess ->
+                            viewModel.createSession(prompt, title, source, startingBranch, requireApproval, onSuccess)
                         }
                     )
                 }
                 is Screen.SessionDetail -> {
                     SessionDetailScreen(
                         session = screen.session,
-                        apiKey = apiKey,
-                        onBack = { currentScreen = Screen.SessionList }
+                        state = state,
+                        onApprovePlan = { viewModel.approvePlan(screen.session.id) },
+                        onSendMessage = { sessionId, msg, onSent -> viewModel.sendMessage(sessionId, msg, onSent) },
+                        onBack = { viewModel.navigateToSessionList() }
                     )
                 }
             }
@@ -76,66 +68,17 @@ fun App() {
 
 @Composable
 fun SessionListScreen(
-    apiKey: String,
+    state: AppState,
     onApiKeyChange: (String) -> Unit,
-    onSessionSelected: (Session) -> Unit
+    onFetchSessions: () -> Unit,
+    onSessionSelected: (Session) -> Unit,
+    onLoadSources: () -> Unit,
+    onCreateSession: (String, String, Source?, String, Boolean, (Session) -> Unit) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var sessions by remember { mutableStateOf<List<Session>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
-    suspend fun fetchSessions(key: String) {
-        if (key.isBlank()) return
-        isLoading = true
-        error = null
-        try {
-            val client = JulesClient(key)
-            var nextPageToken: String? = null
-            val allSessions = mutableListOf<Session>()
-
-            do {
-                val response = client.listSessions(pageSize = 50, pageToken = nextPageToken)
-                if (response.sessions != null) {
-                    allSessions.addAll(response.sessions)
-                }
-                nextPageToken = response.nextPageToken
-            } while (nextPageToken != null)
-
-            sessions = allSessions
-
-            try {
-                val jsonString = jsonFormat.encodeToString(allSessions)
-                CacheManager.writeCache(jsonString)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            error = "Failed to fetch: ${e.message}"
-        } finally {
-            isLoading = false
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        try {
-            val cached = CacheManager.readCache()
-            if (cached != null) {
-                val decoded = jsonFormat.decodeFromString<List<Session>>(cached)
-                sessions = decoded
-            }
-            if (apiKey.isNotBlank()) {
-                fetchSessions(apiKey)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    val filteredSessions = sessions.filter { session ->
+    val filteredSessions = state.sessions.filter { session ->
         if (searchQuery.isBlank()) return@filter true
         val query = searchQuery.lowercase()
         session.name.lowercase().contains(query) ||
@@ -145,9 +88,12 @@ fun SessionListScreen(
 
     Scaffold(
         floatingActionButton = {
-            if (apiKey.isNotBlank()) {
-                FloatingActionButton(onClick = { showCreateDialog = true }) {
-                    Text("+" )
+            if (state.apiKey.isNotBlank()) {
+                FloatingActionButton(onClick = {
+                    onLoadSources()
+                    showCreateDialog = true
+                }) {
+                    Text("+")
                 }
             }
         }
@@ -160,7 +106,7 @@ fun SessionListScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             TextField(
-                value = apiKey,
+                value = state.apiKey,
                 onValueChange = onApiKeyChange,
                 label = { Text("Jules API Key") },
                 modifier = Modifier.fillMaxWidth(),
@@ -168,19 +114,11 @@ fun SessionListScreen(
             )
 
             Button(
-                onClick = {
-                    scope.launch {
-                        if (apiKey.isBlank()) {
-                            error = "API Key is required"
-                            return@launch
-                        }
-                        fetchSessions(apiKey)
-                    }
-                },
+                onClick = onFetchSessions,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
+                enabled = !state.isLoadingSessions
             ) {
-                Text(if (isLoading) "Fetching..." else "Fetch Sessions")
+                Text(if (state.isLoadingSessions) "Fetching..." else "Fetch Sessions")
             }
 
             TextField(
@@ -191,8 +129,8 @@ fun SessionListScreen(
                 singleLine = true
             )
 
-            if (error != null) {
-                Text(text = error!!, color = MaterialTheme.colorScheme.error)
+            if (state.sessionsError != null) {
+                Text(text = state.sessionsError, color = MaterialTheme.colorScheme.error)
             }
 
             LazyColumn(
@@ -223,12 +161,13 @@ fun SessionListScreen(
 
     if (showCreateDialog) {
         CreateSessionDialog(
-            apiKey = apiKey,
+            state = state,
             onDismiss = { showCreateDialog = false },
-            onSessionCreated = { session ->
-                sessions = listOf(session) + sessions
-                showCreateDialog = false
-                onSessionSelected(session)
+            onCreateSession = { prompt, title, source, startingBranch, requireApproval ->
+                onCreateSession(prompt, title, source, startingBranch, requireApproval) { session ->
+                    showCreateDialog = false
+                    onSessionSelected(session)
+                }
             }
         )
     }
@@ -236,35 +175,17 @@ fun SessionListScreen(
 
 @Composable
 fun CreateSessionDialog(
-    apiKey: String,
+    state: AppState,
     onDismiss: () -> Unit,
-    onSessionCreated: (Session) -> Unit
+    onCreateSession: (String, String, Source?, String, Boolean) -> Unit
 ) {
     var prompt by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     var requirePlanApproval by remember { mutableStateOf(true) }
-    var sources by remember { mutableStateOf<List<Source>>(emptyList()) }
     var selectedSource by remember { mutableStateOf<Source?>(null) }
     var startingBranch by remember { mutableStateOf("main") }
-    var isLoadingSources by remember { mutableStateOf(true) }
-    var isCreating by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-
     var sourceSearchQuery by remember { mutableStateOf("") }
     var sourceDropdownExpanded by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        try {
-            val client = JulesClient(apiKey)
-            val response = client.listSources()
-            sources = response.sources ?: emptyList()
-        } catch (e: Exception) {
-            error = "Failed to load sources: ${e.message}"
-        } finally {
-            isLoadingSources = false
-        }
-    }
 
     @OptIn(ExperimentalMaterial3Api::class)
     AlertDialog(
@@ -272,8 +193,11 @@ fun CreateSessionDialog(
         title = { Text("Create Session") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (error != null) {
-                    Text(text = error!!, color = MaterialTheme.colorScheme.error)
+                if (state.sourcesError != null) {
+                    Text(text = state.sourcesError, color = MaterialTheme.colorScheme.error)
+                }
+                if (state.createSessionError != null) {
+                    Text(text = state.createSessionError, color = MaterialTheme.colorScheme.error)
                 }
 
                 TextField(
@@ -291,9 +215,9 @@ fun CreateSessionDialog(
                     singleLine = true
                 )
 
-                if (isLoadingSources) {
+                if (state.isLoadingSources) {
                     Text("Loading sources...")
-                } else if (sources.isEmpty()) {
+                } else if (state.sources.isEmpty()) {
                     Text("No sources available.")
                 } else {
                     ExposedDropdownMenuBox(
@@ -315,7 +239,7 @@ fun CreateSessionDialog(
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sourceDropdownExpanded) },
                             colors = ExposedDropdownMenuDefaults.textFieldColors()
                         )
-                        val filteredSources = sources.filter { it.name.contains(sourceSearchQuery, ignoreCase = true) }
+                        val filteredSources = state.sources.filter { it.name.contains(sourceSearchQuery, ignoreCase = true) }
                         if (filteredSources.isNotEmpty()) {
                             ExposedDropdownMenu(
                                 expanded = sourceDropdownExpanded,
@@ -398,39 +322,13 @@ fun CreateSessionDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (prompt.isBlank()) {
-                        error = "Prompt is required"
-                        return@Button
-                    }
-                    scope.launch {
-                        isCreating = true
-                        error = null
-                        try {
-                            val client = JulesClient(apiKey)
-                            val sourceContext = selectedSource?.let { src ->
-                                SourceContext(
-                                    source = src.name,
-                                    githubRepoContext = GithubRepoContext(startingBranch = startingBranch)
-                                )
-                            }
-                            val request = CreateSessionRequest(
-                                prompt = prompt,
-                                title = title.takeIf { it.isNotBlank() },
-                                sourceContext = sourceContext,
-                                requirePlanApproval = requirePlanApproval
-                            )
-                            val session = client.createSession(request)
-                            onSessionCreated(session)
-                        } catch (e: Exception) {
-                            error = "Failed to create: ${e.message}"
-                        } finally {
-                            isCreating = false
-                        }
+                    if (prompt.isNotBlank()) {
+                        onCreateSession(prompt, title, selectedSource, startingBranch, requirePlanApproval)
                     }
                 },
-                enabled = !isCreating && !isLoadingSources && prompt.isNotBlank()
+                enabled = !state.isCreatingSession && !state.isLoadingSources && prompt.isNotBlank()
             ) {
-                Text(if (isCreating) "Creating..." else "Create")
+                Text(if (state.isCreatingSession) "Creating..." else "Create")
             }
         },
         dismissButton = {
@@ -445,34 +343,12 @@ fun CreateSessionDialog(
 @Composable
 fun SessionDetailScreen(
     session: Session,
-    apiKey: String,
+    state: AppState,
+    onApprovePlan: () -> Unit,
+    onSendMessage: (String, String, () -> Unit) -> Unit,
     onBack: () -> Unit
 ) {
-    var activities by remember { mutableStateOf<List<Activity>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
     var messageText by remember { mutableStateOf("") }
-    var isSending by remember { mutableStateOf(false) }
-    var needsPlanApproval by remember { mutableStateOf(false) }
-    var isApproving by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(session.id) {
-        try {
-            val client = JulesClient(apiKey)
-            // Fetch activities
-            val response = client.listActivities(sessionId = session.id)
-            activities = response.activities ?: emptyList()
-
-            // Update session status to check if plan approval is needed
-            val updatedSession = client.getSession(session.id)
-            needsPlanApproval = updatedSession.state == "AWAITING_PLAN_APPROVAL"
-        } catch (e: Exception) {
-            error = e.message
-        } finally {
-            isLoading = false
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -496,41 +372,34 @@ fun SessionDetailScreen(
             Text(text = "ID: ${session.id}", style = MaterialTheme.typography.bodySmall)
             Text(text = session.prompt, style = MaterialTheme.typography.bodyLarge)
 
-            if (needsPlanApproval) {
+            if (state.needsPlanApproval) {
                 Button(
-                    onClick = {
-                        scope.launch {
-                            isApproving = true
-                            try {
-                                val client = JulesClient(apiKey)
-                                client.approvePlan(session.id)
-                                needsPlanApproval = false
-                            } catch (e: Exception) {
-                                error = "Approval failed: ${e.message}"
-                            } finally {
-                                isApproving = false
-                            }
-                        }
-                    },
+                    onClick = onApprovePlan,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !isApproving
+                    enabled = !state.isApprovingPlan
                 ) {
-                    Text(if (isApproving) "Approving..." else "Approve Plan")
+                    Text(if (state.isApprovingPlan) "Approving..." else "Approve Plan")
                 }
             }
 
-            if (error != null) {
-                Text(text = error!!, color = MaterialTheme.colorScheme.error)
+            if (state.activitiesError != null) {
+                Text(text = state.activitiesError, color = MaterialTheme.colorScheme.error)
+            }
+            if (state.approvePlanError != null) {
+                Text(text = state.approvePlanError, color = MaterialTheme.colorScheme.error)
+            }
+            if (state.sendMessageError != null) {
+                Text(text = state.sendMessageError, color = MaterialTheme.colorScheme.error)
             }
 
-            if (isLoading) {
+            if (state.isLoadingActivities) {
                 CircularProgressIndicator()
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(activities) { activity ->
+                    items(state.activities) { activity ->
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
@@ -583,23 +452,11 @@ fun SessionDetailScreen(
                 IconButton(
                     onClick = {
                         if (messageText.isBlank()) return@IconButton
-                        scope.launch {
-                            isSending = true
-                            try {
-                                val client = JulesClient(apiKey)
-                                client.sendMessage(session.id, SendMessageRequest(prompt = messageText))
-                                messageText = ""
-                                // Refresh activities
-                                val response = client.listActivities(sessionId = session.id)
-                                activities = response.activities ?: emptyList()
-                            } catch (e: Exception) {
-                                error = "Failed to send: ${e.message}"
-                            } finally {
-                                isSending = false
-                            }
+                        onSendMessage(session.id, messageText) {
+                            messageText = ""
                         }
                     },
-                    enabled = !isSending && messageText.isNotBlank()
+                    enabled = !state.isSendingMessage && messageText.isNotBlank()
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Send, ("Send"))
                 }

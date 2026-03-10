@@ -1,5 +1,6 @@
 package org.sternbach.software.julesmobileapp.ui.composable
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +28,7 @@ fun ActivityCard(
     session: Session
 ) {
     var activityFetched by remember { mutableStateOf(false) }
+    var expanded by remember(activity) { mutableStateOf(false) }
 
     val content = remember(activity) {
         StringBuilder().apply {
@@ -65,7 +67,11 @@ fun ActivityCard(
         }.toString().trim()
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = activity.originator ?: "Unknown",
@@ -75,7 +81,11 @@ fun ActivityCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             if (content.isNotEmpty()) {
-                CollapsibleText(content)
+                CollapsibleText(
+                    string = content,
+                    expanded = expanded,
+                    onToggle = { expanded = !expanded }
+                )
             }
 
             if (content.isEmpty()) {

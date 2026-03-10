@@ -46,7 +46,6 @@ fun SessionDetailScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(text = "ID: ${session.id}", style = MaterialTheme.typography.bodySmall)
-            CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge)
 
             if (state.needsPlanApproval) {
                 Button(
@@ -69,12 +68,18 @@ fun SessionDetailScreen(
             }
 
             if (state.isLoadingActivities) {
-                CircularProgressIndicator()
+                CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    CircularProgressIndicator()
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    item {
+                        CollapsibleText(session.prompt, style = MaterialTheme.typography.bodyLarge)
+                    }
                     items(state.activities) { activity ->
                         ActivityCard(activity, onFetchActivity, session)
                     }

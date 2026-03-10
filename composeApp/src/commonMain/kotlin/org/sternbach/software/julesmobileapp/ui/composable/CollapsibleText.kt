@@ -1,5 +1,6 @@
 package org.sternbach.software.julesmobileapp.ui.composable
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -19,28 +20,38 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 
 @Composable
-fun CollapsibleText(string: String, style: TextStyle? = null) {
-    var expanded by remember(string) { mutableStateOf(false) }
+fun CollapsibleText(
+    string: String,
+    style: TextStyle? = null,
+    expanded: Boolean? = null,
+    onToggle: (() -> Unit)? = null
+) {
+    var localExpanded by remember(string) { mutableStateOf(false) }
+    val isExpanded = expanded ?: localExpanded
+    val toggle = onToggle ?: { localExpanded = !localExpanded }
     var isEllipsized by remember(string) { mutableStateOf(false) }
 
-    Row(verticalAlignment = Alignment.Top) {
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = Modifier.clickable { toggle() }
+    ) {
         Text(
             text = string,
             style = style ?: MaterialTheme.typography.bodyMedium,
-            maxLines = if (expanded) Int.MAX_VALUE else 2,
+            maxLines = if (isExpanded) Int.MAX_VALUE else 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
             onTextLayout = { textLayoutResult ->
-                if (!expanded) {
+                if (!isExpanded) {
                     isEllipsized = textLayoutResult.hasVisualOverflow
                 }
             }
         )
-        if (expanded || isEllipsized) {
-            IconButton(onClick = { expanded = !expanded }) {
+        if (isExpanded || isEllipsized) {
+            IconButton(onClick = { toggle() }) {
                 Icon(
-                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Show less" else "Show more"
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Show less" else "Show more"
                 )
             }
         }
